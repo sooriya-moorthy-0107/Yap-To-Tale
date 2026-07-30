@@ -1,0 +1,151 @@
+# =============================================================================
+# Yap-to-Tale — Kubernetes Deployment Manifest
+# =============================================================================
+# This manifest defines a Deployment with 3 replicas of the Yap-to-Tale
+# microservice. It includes resource limits, liveness/readiness probes,
+# and environment variable placeholders for AWS configuration.
+# =============================================================================
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  # Name of the Deployment object in the cluster
+  name: yap-to-tale
+  # Labels for organizational purposes and selector matching
+  labels:
+    app: yap-to-tale
+    tier: backend
+    environment: production
+spec:
+  # ---------------------------------------------------------------------------
+  # Replica Configuration
+  # ---------------------------------------------------------------------------
+  # Run 3 identical pods for high availability and load distribution.
+  # Kubernetes will ensure exactly 3 pods are running at all times.
+  replicas: 3
+
+  # ---------------------------------------------------------------------------
+  # Selector — tells the Deployment which Pods it manages
+  # ---------------------------------------------------------------------------
+  selector:
+    matchLabels:
+      app: yap-to-tale
+
+  # ---------------------------------------------------------------------------
+  # Rolling Update Strategy
+  # ---------------------------------------------------------------------------
+  # maxSurge: 1 extra pod can be created during an update
+  # maxUnavailable: 0 means zero downtime deployments
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+
+  # ---------------------------------------------------------------------------
+  # Pod Template — defines the actual container specification
+  # ---------------------------------------------------------------------------
+  template:
+    metadata:
+      labels:
+        app: yap-to-tale
+        tier: backend
+    spec:
+      # -----------------------------------------------------------------------
+      # Container Specification
+      # -----------------------------------------------------------------------
+      containers:
+        - name: yap-to-tale
+          # IMPORTANT: Replace this with your actual ECR/DockerHub image URI
+          # Example: 123456789012.dkr.ecr.us-east-1.amazonaws.com/yap-to-tale:latest
+          image: yap-to-tale:latest
+          # Use IfNotPresent for production; use Always for dev/staging
+          imagePullPolicy: IfNotPresent
+
+          # -------------------------------------------------------------------
+          # Port Configuration
+          # -------------------------------------------------------------------
+          ports:
+            - containerPort: 5000
+              protocol: TCP
+              name: http
+
+          # -------------------------------------------------------------------
+          # Environment Variables (AWS Configuration)
+          # -------------------------------------------------------------------
+          # These are placeholders — in production, use a ConfigMap or
+          # Kubernetes Secrets for sensitive values.
+          env:
+            # AWS Region where Bedrock, Polly, S3, and DynamoDB are deployed
+            - name: AWS_REGION
+              value: "us-east-1"
+
+            # S3 bucket name for storing generated MP3 audio files
+            - name: S3_BUCKET_NAME
+              value: "yap-to-tale-audio-bucket"
+
+            # DynamoDB table name for persisting transformation metadata
+            - name: DYNAMODB_TABLE_NAME
+              value: "yap-to-tale-records"
+
+            # Amazon Bedrock Model ID for text generation
+            # Default: Claude 3 Sonnet (change to your preferred model)
+            - name: BEDROCK_MODEL_ID
+              value: "anthropic.claude-3-sonnet-20240229-v1:0"
+
+            # AWS Polly voice ID for text-to-speech synthesis
+            - name: POLLY_VOICE_ID
+              value: "Matthew"
+
+            # Flask environment setting
+            - name: FLASK_ENV
+              value: "production"
+
+          # -------------------------------------------------------------------
+          # Resource Limits and Requests
+          # -------------------------------------------------------------------
+          # Requests = guaranteed minimum resources for scheduling
+          # Limits   = hard ceiling the container cannot exceed
+          resources:
+            requests:
+              cpu: "250m"        # 0.25 vCPU minimum
+              memory: "256Mi"    # 256 MB minimum RAM
+            limits:
+              cpu: "500m"        # 0.5 vCPU maximum
+              memory: "512Mi"    # 512 MB maximum RAM
+
+          # -------------------------------------------------------------------
+          # Liveness Probe — restarts the container if it becomes unresponsive
+          # -------------------------------------------------------------------
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            initialDelaySeconds: 15    # Wait 15s after startup before probing
+            periodSeconds: 20          # Check every 20 seconds
+            timeoutSeconds: 5          # Timeout after 5 seconds
+            failureThreshold: 3        # Restart after 3 consecutive failures
+
+          # -------------------------------------------------------------------
+          # Readiness Probe — removes pod from Service if it can't serve traffic
+          # -------------------------------------------------------------------
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            initialDelaySeconds: 5     # Start checking 5s after startup
+            periodSeconds: 10          # Check every 10 seconds
+            timeoutSeconds: 3          # Timeout after 3 seconds
+            failureThreshold: 3        # Mark unready after 3 failures
+
+      # -----------------------------------------------------------------------
+      # Restart Policy
+      # -----------------------------------------------------------------------
+      # Always restart crashed containers (default for Deployments)
+      restartPolicy: Always
+
+      # -----------------------------------------------------------------------
+      # Termination Grace Period
+      # -----------------------------------------------------------------------
+      # Give the pod 30 seconds to gracefully shut down before SIGKILL
+      terminationGracePeriodSeconds: 30
