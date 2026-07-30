@@ -1,3 +1,7 @@
+<div align="center">
+  <img src="https://readme-typing-svg.herokuapp.com?font=Fira+Code&weight=700&size=28&pause=1000&color=F7B00A&center=true&vCenter=true&width=500&lines=🚧+Project+Under+Construction+🚧;Deploying+Microservices...;Waking+up+the+AI...;Building+Cloud+Infrastructure..." alt="Under Construction Animation" />
+</div>
+
 # 🎙️ Yap-to-Tale: Cloud-Native GenAI & Audio Synthesis
 
 ![Python](https://img.shields.io/badge/Python-3.12-blue?logo=python)
