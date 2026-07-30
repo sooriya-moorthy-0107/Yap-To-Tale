@@ -1,0 +1,17 @@
+# =============================================================================
+# Yap-to-Tale — Python Dependencies
+# =============================================================================
+# Core web framework
+Flask==3.1.1
+
+# Production-grade WSGI HTTP server (replaces Flask dev server)
+gunicorn==23.0.0
+
+# AWS SDK for Python — used for Bedrock, Polly, S3, and DynamoDB
+boto3==1.38.34
+
+# Cross-Origin Resource Sharing support for API endpoints
+flask-cors==6.0.0
+
+# Unique identifier generation for DynamoDB records
+# (uuid is stdlib, but we list it here as a reminder — no install needed)

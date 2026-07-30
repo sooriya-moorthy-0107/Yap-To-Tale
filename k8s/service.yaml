@@ -1,0 +1,44 @@
+# =============================================================================
+# Yap-to-Tale — Kubernetes Service Manifest
+# =============================================================================
+# This Service exposes the Yap-to-Tale Deployment externally using a
+# LoadBalancer type. It routes incoming traffic on port 80 to the
+# application's target port 5000 inside the pods.
+# =============================================================================
+
+apiVersion: v1
+kind: Service
+metadata:
+  # Name of the Service object in the cluster
+  name: yap-to-tale-service
+  # Labels for organizational purposes
+  labels:
+    app: yap-to-tale
+    tier: backend
+    environment: production
+spec:
+  # ---------------------------------------------------------------------------
+  # Service Type: LoadBalancer
+  # ---------------------------------------------------------------------------
+  # LoadBalancer provisions an external cloud load balancer (e.g., AWS ELB/NLB)
+  # that distributes incoming traffic across all healthy pods.
+  # For local development with minikube, use `minikube tunnel` to access.
+  type: LoadBalancer
+
+  # ---------------------------------------------------------------------------
+  # Selector — matches pods managed by the Deployment
+  # ---------------------------------------------------------------------------
+  # The Service will route traffic only to pods with this label.
+  selector:
+    app: yap-to-tale
+
+  # ---------------------------------------------------------------------------
+  # Port Configuration
+  # ---------------------------------------------------------------------------
+  ports:
+    - name: http
+      protocol: TCP
+      # External port — clients connect to this port
+      port: 80
+      # Internal port — forwards to this port on the pod (gunicorn listens here)
+      targetPort: 5000
