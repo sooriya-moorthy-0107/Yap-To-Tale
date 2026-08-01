@@ -1,0 +1,33 @@
+# =============================================================================
+# Yap-to-Tale — Docker Compose Configuration
+# =============================================================================
+# Spin up the Yap-to-Tale microservice container with environment variables.
+# Usage:
+#   docker compose up --build
+# =============================================================================
+
+version: "3.8"
+
+services:
+  yap-to-tale:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: yap-to-tale:latest
+    container_name: yap-to-tale-app
+    ports:
+      - "5000:5000"
+    environment:
+      - AWS_REGION=${AWS_REGION:-us-east-1}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - S3_BUCKET_NAME=${S3_BUCKET_NAME:-yap-to-tale-audio-12345}
+      - DYNAMODB_TABLE_NAME=${DYNAMODB_TABLE_NAME:-yap-to-tale-records}
+      - MOCK_AWS=${MOCK_AWS:-false}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:5000/health')\" || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s

@@ -139,6 +139,14 @@ def health_check():
     }), 200
 
 
+AUDIO_CACHE = {}
+
+@app.route("/api/audio/<audio_id>", methods=["GET"])
+def serve_cached_audio(audio_id):
+    if audio_id in AUDIO_CACHE:
+        return app.response_class(AUDIO_CACHE[audio_id], mimetype="audio/mpeg")
+    return jsonify({"error": "Audio not found"}), 404
+
 # =============================================================================
 # Route: Main Transformation Endpoint
 # =============================================================================
@@ -245,21 +253,31 @@ def transform_text():
         audio_stream = synthesize_speech(epic_text)
         logger.info("Speech synthesis complete")
 
+        record_id = str(uuid.uuid4())
+        s3_key = f"audio/{record_id}.mp3"
+        audio_bytes = audio_stream.getvalue()
+        AUDIO_CACHE[record_id] = audio_bytes
+
         # =====================================================================
         # STEP 4: Upload MP3 to S3 (Stateless — in-memory buffer)
         # =====================================================================
-        record_id = str(uuid.uuid4())
-        s3_key = f"audio/{record_id}.mp3"
-        logger.info(f"Uploading audio to S3: {s3_key}")
-        audio_url = upload_to_s3(audio_stream, s3_key)
-        logger.info(f"Audio uploaded successfully: {audio_url}")
+        try:
+            logger.info(f"Uploading audio to S3: {s3_key}")
+            audio_url = upload_to_s3(audio_stream, s3_key)
+            logger.info(f"Audio uploaded successfully: {audio_url}")
+        except Exception as s3_err:
+            logger.warning(f"S3 upload encounter error ({s3_err}). Serving Polly voice audio via local API route.")
+            audio_url = f"/api/audio/{record_id}"
 
         # =====================================================================
         # STEP 5: Persist Metadata to DynamoDB
         # =====================================================================
-        logger.info(f"Saving record to DynamoDB: {record_id}")
-        save_to_dynamodb(record_id, original_text, epic_text, audio_url, story_genre)
-        logger.info("Record saved successfully")
+        try:
+            logger.info(f"Saving record to DynamoDB: {record_id}")
+            save_to_dynamodb(record_id, original_text, epic_text, audio_url, story_genre)
+            logger.info("Record saved successfully")
+        except Exception as db_err:
+            logger.warning(f"DynamoDB save encounter error ({db_err}).")
 
         # =====================================================================
         # STEP 6: Return Response to Client
@@ -267,14 +285,14 @@ def transform_text():
         payload = {
             "id": record_id,
             "epic_text": epic_text,
-            "audio_url": audio_url,
+            "audio_url": f"/api/audio/{record_id}",
         }
         if story_genre:
             payload["genre"] = story_genre
         return jsonify(payload), 200
 
-    except (ClientError, Exception) as e:
-        logger.warning(f"AWS operation failed: {e}. Falling back to Demo mode for local testing.")
+    except Exception as e:
+        logger.warning(f"Transformation pipeline failed: {e}. Falling back to Demo mode.")
         record_id = str(uuid.uuid4())
         epic_text = mock_narrative(original_text, story_genre)
         audio_url = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"
@@ -287,6 +305,7 @@ def transform_text():
         if story_genre:
             payload["genre"] = story_genre
         return jsonify(payload), 200
+
 
 
 
@@ -419,22 +438,25 @@ def invoke_bedrock(input_text: str, story_genre: str | None = None) -> str:
         ],
     })
 
-    # Invoke the Bedrock model
-    response = bedrock_runtime.invoke_model(
-        modelId=BEDROCK_MODEL_ID,
-        contentType="application/json",
-        accept="application/json",
-        body=request_body,
-    )
+    try:
+        # Invoke the Bedrock model
+        response = bedrock_runtime.invoke_model(
+            modelId=BEDROCK_MODEL_ID,
+            contentType="application/json",
+            accept="application/json",
+            body=request_body,
+        )
 
-    # Parse the response body
-    response_body = json.loads(response["body"].read())
+        # Parse the response body
+        response_body = json.loads(response["body"].read())
 
-    # Extract the generated text from Claude's response format
-    # Claude returns content as a list of content blocks
-    epic_text = response_body["content"][0]["text"].strip()
+        # Extract the generated text from Claude's response format
+        epic_text = response_body["content"][0]["text"].strip()
+        return epic_text
+    except Exception as e:
+        logger.warning(f"Bedrock invocation failed ({e}). Falling back to narrative generator for text, proceeding with AWS Polly & S3.")
+        return mock_narrative(input_text, story_genre)
 
-    return epic_text
 
 
 def synthesize_speech(text: str) -> io.BytesIO:
@@ -458,13 +480,22 @@ def synthesize_speech(text: str) -> io.BytesIO:
     """
 
     # Call AWS Polly to synthesize speech
-    # Using the 'neural' engine for more natural, human-like speech
-    response = polly_client.synthesize_speech(
-        Text=text,
-        OutputFormat="mp3",           # MP3 format for broad compatibility
-        VoiceId=POLLY_VOICE_ID,       # Configurable voice (default: Matthew)
-        Engine="neural",              # Neural engine for premium voice quality
-    )
+    try:
+        response = polly_client.synthesize_speech(
+            Text=text,
+            OutputFormat="mp3",           # MP3 format for broad compatibility
+            VoiceId=POLLY_VOICE_ID,       # Configurable voice (default: Matthew)
+            Engine="neural",              # Neural engine for premium voice quality
+        )
+    except Exception as e:
+        logger.warning(f"Neural engine speech synthesis failed ({e}). Falling back to standard engine.")
+        response = polly_client.synthesize_speech(
+            Text=text,
+            OutputFormat="mp3",
+            VoiceId=POLLY_VOICE_ID,
+            Engine="standard",
+        )
+
 
     # Read the audio stream into an in-memory buffer
     # IMPORTANT: We do NOT save to disk — the app must remain stateless

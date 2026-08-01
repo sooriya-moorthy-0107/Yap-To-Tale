@@ -1,0 +1,51 @@
+# =============================================================================
+# Yap-to-Tale — Git Ignore Rules
+# =============================================================================
+
+# Secret / Environment Files (CRITICAL — never commit AWS keys)
+.env
+.env.local
+.env.*.local
+*.pem
+
+# Python Cache & Bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual Environment
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+.venv/
+
+# IDE & Editor Settings
+.vscode/
+.idea/
+*.swp
+*.swo
+*.sublime-project
+*.sublime-workspace
+
+# Logs & Temporary Data
+*.log
+logs/
+tmp/
+temp/
+
+# OS Metadata
+.DS_Store
+Thumbs.db
+ehthumbs.db
+
+# Docker local overrides
+docker-compose.override.yml
+
+# Testing & Coverage
+.pytest_cache/
+.coverage
+htmlcov/
