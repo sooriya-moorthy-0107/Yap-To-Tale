@@ -55,6 +55,17 @@ BEDROCK_MODEL_ID = os.environ.get(
 )
 POLLY_VOICE_ID = os.environ.get("POLLY_VOICE_ID", "Matthew")
 
+# Supported story genres for genre-mode transformation (epic mode uses no genre / "epic")
+STORY_GENRES = frozenset({
+    "fantasy",
+    "horror",
+    "science-fiction",
+    "romance",
+    "mystery",
+    "thriller",
+    "comedy",
+})
+
 # Set MOCK_AWS=true in environment or leave AWS credentials unconfigured for local demo mode
 MOCK_AWS = os.environ.get("MOCK_AWS", "false").lower() in ("true", "1", "yes")
 
@@ -146,12 +157,14 @@ def transform_text():
 
     Request Body (JSON):
         { "text": "Today I fixed a critical bug in production..." }
+        Optional: { "genre": "fantasy" | "horror" | "science-fiction" | ... }
 
     Response (JSON):
         {
             "id": "uuid-string",
             "epic_text": "In the darkest hour of the digital realm...",
-            "audio_url": "https://bucket.s3.amazonaws.com/audio/uuid.mp3"
+            "audio_url": "https://bucket.s3.amazonaws.com/audio/uuid.mp3",
+            "genre": "fantasy"
         }
 
     Error Response (JSON):
@@ -181,7 +194,22 @@ def transform_text():
         logger.warning(f"Text too long: {len(original_text)} characters")
         return jsonify({"error": "Text exceeds maximum length of 5000 characters"}), 400
 
-    logger.info(f"Processing text of length {len(original_text)}")
+    raw_genre = data.get("genre")
+    story_genre = None
+    if raw_genre is not None:
+        if not isinstance(raw_genre, str):
+            return jsonify({"error": "Field 'genre' must be a string"}), 400
+        story_genre = raw_genre.strip().lower()
+        if story_genre == "epic":
+            story_genre = None
+        elif story_genre not in STORY_GENRES:
+            allowed = ", ".join(sorted(STORY_GENRES))
+            return jsonify({"error": f"Invalid genre. Choose one of: {allowed}"}), 400
+
+    logger.info(
+        f"Processing text of length {len(original_text)}"
+        + (f" (genre={story_genre})" if story_genre else " (epic mode)")
+    )
 
     # Check if AWS clients can be initialized or if mock mode is forced
     use_aws = not MOCK_AWS and get_aws_clients()
@@ -189,26 +217,25 @@ def transform_text():
     if not use_aws:
         logger.info("Running in DEMO / MOCK mode (No AWS credentials required)")
         record_id = str(uuid.uuid4())
-        epic_text = (
-            f"In the darkest hour of the realm, a warrior stepped into the crucible of destiny to declare: "
-            f"'{original_text}'. The sky split asunder, thunder roared across the ancient valleys, "
-            f"and from that moment forth, their chronicle was etched into the eternal halls of legend!"
-        )
+        epic_text = mock_narrative(original_text, story_genre)
         # Standard sample audio for local testing
         audio_url = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"
-        return jsonify({
+        payload = {
             "id": record_id,
             "epic_text": epic_text,
             "audio_url": audio_url,
-            "demo_mode": True
-        }), 200
+            "demo_mode": True,
+        }
+        if story_genre:
+            payload["genre"] = story_genre
+        return jsonify(payload), 200
 
     try:
         # =====================================================================
         # STEP 2: Invoke Amazon Bedrock for Epic Narrative Generation
         # =====================================================================
         logger.info("Invoking Amazon Bedrock for text transformation")
-        epic_text = invoke_bedrock(original_text)
+        epic_text = invoke_bedrock(original_text, story_genre)
         logger.info(f"Bedrock returned epic text of length {len(epic_text)}")
 
         # =====================================================================
@@ -231,33 +258,35 @@ def transform_text():
         # STEP 5: Persist Metadata to DynamoDB
         # =====================================================================
         logger.info(f"Saving record to DynamoDB: {record_id}")
-        save_to_dynamodb(record_id, original_text, epic_text, audio_url)
+        save_to_dynamodb(record_id, original_text, epic_text, audio_url, story_genre)
         logger.info("Record saved successfully")
 
         # =====================================================================
         # STEP 6: Return Response to Client
         # =====================================================================
-        return jsonify({
+        payload = {
             "id": record_id,
             "epic_text": epic_text,
             "audio_url": audio_url,
-        }), 200
+        }
+        if story_genre:
+            payload["genre"] = story_genre
+        return jsonify(payload), 200
 
     except (ClientError, Exception) as e:
         logger.warning(f"AWS operation failed: {e}. Falling back to Demo mode for local testing.")
         record_id = str(uuid.uuid4())
-        epic_text = (
-            f"In the darkest hour of the realm, a warrior stepped into the crucible of destiny to declare: "
-            f"'{original_text}'. The sky split asunder, thunder roared across the ancient valleys, "
-            f"and from that moment forth, their chronicle was etched into the eternal halls of legend!"
-        )
+        epic_text = mock_narrative(original_text, story_genre)
         audio_url = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"
-        return jsonify({
+        payload = {
             "id": record_id,
             "epic_text": epic_text,
             "audio_url": audio_url,
-            "demo_mode": True
-        }), 200
+            "demo_mode": True,
+        }
+        if story_genre:
+            payload["genre"] = story_genre
+        return jsonify(payload), 200
 
 
 
@@ -265,27 +294,77 @@ def transform_text():
 # AWS Service Functions
 # =============================================================================
 
-def invoke_bedrock(input_text: str) -> str:
-    """
-    Invoke Amazon Bedrock to transform plain text into an epic narrative.
+def mock_narrative(original_text: str, story_genre: str | None) -> str:
+    """Demo-mode narrative when AWS is unavailable."""
+    if not story_genre:
+        return (
+            f"In the darkest hour of the realm, a warrior stepped into the crucible of destiny to declare: "
+            f"'{original_text}'. The sky split asunder, thunder roared across the ancient valleys, "
+            f"and from that moment forth, their chronicle was etched into the eternal halls of legend!"
+        )
+    genre_intros = {
+        "fantasy": (
+            f"By torchlight in the elder woods, the day's deeds were whispered into the chronicles: "
+            f"'{original_text}'. Runes glowed along the margin, and bards would sing of this hour for ages."
+        ),
+        "horror": (
+            f"The journal entry should never have been read aloud: '{original_text}'. "
+            f"Each word seemed to draw the dark closer, until the room itself felt like it was listening."
+        ),
+        "science-fiction": (
+            f"Starship log, cycle 4412 — '{original_text}'. "
+            f"Telemetry flickered; the crew understood that ordinary routine had just become a pivot in the timeline."
+        ),
+        "romance": (
+            f"Soft light, a quiet evening, and the truth finally spoken: '{original_text}'. "
+            f"What began as an ordinary day became the moment two lives leaned toward the same horizon."
+        ),
+        "mystery": (
+            f"The case file noted only this: '{original_text}'. "
+            f"Every detail aligned too neatly—someone had arranged the day like clues waiting to be read."
+        ),
+        "thriller": (
+            f"The secure line crackled once: '{original_text}'. "
+            f"Clocks reset; exits were watched; there would be no safe return to normal after that message."
+        ),
+        "comedy": (
+            f"So apparently today went like this: '{original_text}'. "
+            f"By dinner, everyone agreed it belonged in a sitcom—minus the laugh track, plus the coffee spills."
+        ),
+    }
+    return genre_intros.get(
+        story_genre,
+        f"[{story_genre}] {original_text}",
+    )
 
-    Uses the Anthropic Claude model via the Bedrock Runtime API. The prompt
-    instructs the model to rewrite the input as a dramatic, movie-trailer
-    style narrative while preserving all factual details.
 
-    Args:
-        input_text: The original user text ("yap") to transform.
+def build_transformation_prompt(input_text: str, story_genre: str | None) -> str:
+    """Build the Bedrock user prompt for epic or genre-specific story mode."""
+    if story_genre:
+        genre_labels = {
+            "fantasy": "high fantasy",
+            "horror": "horror",
+            "science-fiction": "science fiction",
+            "romance": "romance",
+            "mystery": "mystery",
+            "thriller": "thriller",
+            "comedy": "comedy",
+        }
+        label = genre_labels.get(story_genre, story_genre)
+        return (
+            f"You are an acclaimed {label} author. Transform the following everyday "
+            f"micro-log into a short {label} story paragraph.\n\n"
+            "Rules:\n"
+            "1. Preserve ALL factual details from the original text (who, what, when, where).\n"
+            f"2. Use tone, imagery, and pacing appropriate to {label} fiction.\n"
+            "3. Write in third person or first person as fits the genre; stay immersive.\n"
+            "4. Keep the output to one paragraph (3-6 sentences).\n"
+            "5. Do NOT add titles, labels, or meta commentary — return ONLY the story text.\n\n"
+            f"Original micro-log entry:\n\"{input_text}\"\n\n"
+            f"{label.capitalize()} story:"
+        )
 
-    Returns:
-        The generated epic narrative as a string.
-
-    Raises:
-        ClientError: If the Bedrock API call fails.
-    """
-
-    # Craft a detailed prompt that instructs the model to produce
-    # dramatic, cinematic narration from mundane daily logs
-    prompt = (
+    return (
         "You are a legendary narrator with the combined storytelling power of "
         "Morgan Freeman, a Marvel movie trailer voice-over artist, and an epic "
         "fantasy author. Your task is to take the following mundane, everyday "
@@ -302,6 +381,28 @@ def invoke_bedrock(input_text: str) -> str:
         f"Original micro-log entry:\n\"{input_text}\"\n\n"
         "Epic narrative:"
     )
+
+
+def invoke_bedrock(input_text: str, story_genre: str | None = None) -> str:
+    """
+    Invoke Amazon Bedrock to transform plain text into a narrative.
+
+    Uses the Anthropic Claude model via the Bedrock Runtime API. The prompt
+    instructs the model to rewrite the input as epic or genre-specific fiction
+    while preserving all factual details.
+
+    Args:
+        input_text: The original user text ("yap") to transform.
+        story_genre: Optional genre key from STORY_GENRES; None for epic mode.
+
+    Returns:
+        The generated narrative as a string.
+
+    Raises:
+        ClientError: If the Bedrock API call fails.
+    """
+
+    prompt = build_transformation_prompt(input_text, story_genre)
 
     # Construct the request payload for the Anthropic Claude Messages API
     # This follows the Bedrock Converse/InvokeModel format for Claude models
@@ -416,6 +517,7 @@ def save_to_dynamodb(
     original_text: str,
     epic_text: str,
     audio_url: str,
+    story_genre: str | None = None,
 ) -> None:
     """
     Persist transformation metadata to Amazon DynamoDB.
@@ -436,15 +538,16 @@ def save_to_dynamodb(
 
     # Write the item to DynamoDB
     # The table's partition key is assumed to be 'id' (String type)
-    dynamodb_table.put_item(
-        Item={
-            "id": record_id,                                        # Partition key (UUID)
-            "original_text": original_text,                         # Raw user input
-            "epic_text": epic_text,                                 # AI-generated narrative
-            "audio_url": audio_url,                                 # S3 URL for the MP3 file
-            "created_at": datetime.now(timezone.utc).isoformat(),   # ISO 8601 timestamp
-        }
-    )
+    item = {
+        "id": record_id,
+        "original_text": original_text,
+        "epic_text": epic_text,
+        "audio_url": audio_url,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    if story_genre:
+        item["genre"] = story_genre
+    dynamodb_table.put_item(Item=item)
 
 
 # =============================================================================
