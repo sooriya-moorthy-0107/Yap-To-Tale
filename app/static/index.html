@@ -1,88 +1,40 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <!--
-    ==========================================================================
-    Yap-to-Tale — Frontend HTML
-    ==========================================================================
-    Modern, dark-mode single-page application for the Yap-to-Tale
-    microservice. Users enter their daily micro-log ("yap"), submit it
-    for transformation, and receive an epic narrative with audio playback.
-    ==========================================================================
-    -->
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <!-- SEO Meta Tags -->
-    <title>Yap-to-Tale — Transform Your Day Into an Epic Saga</title>
-    <meta name="description" content="Yap-to-Tale transforms your mundane daily logs into epic, dramatic narratives with AI-powered text generation and speech synthesis.">
-    <meta name="keywords" content="AI narrative, text transformation, speech synthesis, epic story generator">
+    <title>Yap-to-Tale — Daily logs into narratives</title>
+    <meta name="description" content="Transform daily micro-logs into epic or genre-specific stories with AI text generation and speech synthesis.">
 
-    <!-- Google Fonts — Inter for modern, clean typography -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Cinzel:wght@400;700;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
-    <!-- Application Stylesheet -->
     <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
 
-    <!-- ====================================================================
-         Background Animated Particles (decorative)
-         ==================================================================== -->
-    <div class="bg-particles" aria-hidden="true">
-        <div class="particle particle-1"></div>
-        <div class="particle particle-2"></div>
-        <div class="particle particle-3"></div>
-        <div class="particle particle-4"></div>
-        <div class="particle particle-5"></div>
-    </div>
-
-    <!-- ====================================================================
-         Main Application Container
-         ==================================================================== -->
     <main class="app-container">
 
-        <!-- ================================================================
-             Header Section
-             ================================================================ -->
         <header class="app-header">
-            <!-- Animated logo icon -->
-            <div class="logo-icon" aria-hidden="true">
-                <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <circle cx="24" cy="24" r="22" stroke="url(#logo-gradient)" stroke-width="2.5" fill="none"/>
-                    <path d="M16 18C16 18 20 14 24 14C28 14 32 18 32 18" stroke="url(#logo-gradient)" stroke-width="2" stroke-linecap="round"/>
-                    <path d="M14 28L24 36L34 28" stroke="url(#logo-gradient)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                    <circle cx="24" cy="24" r="3" fill="url(#logo-gradient)"/>
-                    <defs>
-                        <linearGradient id="logo-gradient" x1="0" y1="0" x2="48" y2="48">
-                            <stop offset="0%" stop-color="#a855f7"/>
-                            <stop offset="100%" stop-color="#6366f1"/>
-                        </linearGradient>
-                    </defs>
+            <div class="logo-mark" aria-hidden="true">
+                <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect x="1" y="1" width="38" height="38" rx="8" stroke="currentColor" stroke-width="1.5"/>
+                    <path d="M12 14h16M12 20h12M12 26h14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
                 </svg>
             </div>
-
-            <h1 class="app-title">
-                <span class="title-yap">Yap</span><span class="title-separator">-to-</span><span class="title-tale">Tale</span>
-            </h1>
-            <p class="app-subtitle">Transform your mundane day into an epic saga</p>
+            <h1 class="app-title">Yap-to-Tale</h1>
+            <p class="app-subtitle">Turn your daily log into a narrative or genre story</p>
         </header>
 
-        <!-- ================================================================
-             Input Section — User enters their "yap" here
-             ================================================================ -->
         <section class="input-section" aria-label="Input your daily log">
             <div class="input-card">
-                <label for="yap-input" class="input-label">
-                    <span class="label-icon" aria-hidden="true">✍️</span>
-                    Your Daily Yap
-                </label>
+                <label for="yap-input" class="input-label">Daily log</label>
                 <textarea
                     id="yap-input"
                     class="yap-textarea"
-                    placeholder="Tell us about your day... e.g., 'I woke up late, had coffee, fixed a bug in the login page, and walked my dog in the park.'"
+                    placeholder="Describe your day — meetings, errands, wins, and everything in between."
                     rows="5"
                     maxlength="5000"
                     aria-describedby="char-counter"
@@ -91,52 +43,59 @@
                     <span id="char-counter" class="char-counter">0 / 5000</span>
                 </div>
 
-                <!-- Submit Button with Loading State -->
-                <button id="transform-btn" class="transform-btn" type="button" aria-label="Transform your yap into an epic tale">
-                    <span class="btn-default-content">
-                        <span class="btn-icon" aria-hidden="true">⚡</span>
-                        Epicify My Yap
-                    </span>
-                    <span class="btn-loading-content" hidden>
-                        <span class="spinner" aria-hidden="true"></span>
-                        Forging Your Legend...
-                    </span>
-                </button>
+                <div class="genre-field">
+                    <label for="story-genre" class="input-label">Story genre</label>
+                    <select id="story-genre" class="genre-select" aria-describedby="genre-hint">
+                        <option value="fantasy">Fantasy</option>
+                        <option value="horror">Horror</option>
+                        <option value="science-fiction">Science fiction</option>
+                        <option value="romance">Romance</option>
+                        <option value="mystery">Mystery</option>
+                        <option value="thriller">Thriller</option>
+                        <option value="comedy">Comedy</option>
+                    </select>
+                    <p id="genre-hint" class="field-hint">Used when you generate a genre story.</p>
+                </div>
+
+                <div class="action-buttons">
+                    <button id="transform-btn" class="btn btn-primary" type="button">
+                        <span class="btn-default-content">Generate epic narrative</span>
+                        <span class="btn-loading-content" hidden>
+                            <span class="spinner" aria-hidden="true"></span>
+                            Generating…
+                        </span>
+                    </button>
+                    <button id="genre-story-btn" class="btn btn-secondary" type="button">
+                        <span class="btn-default-content">Generate genre story</span>
+                        <span class="btn-loading-content" hidden>
+                            <span class="spinner spinner-dark" aria-hidden="true"></span>
+                            Generating…
+                        </span>
+                    </button>
+                </div>
             </div>
         </section>
 
-        <!-- ================================================================
-             Error Display Section
-             ================================================================ -->
         <section id="error-section" class="error-section" hidden aria-live="assertive">
             <div class="error-card">
-                <span class="error-icon" aria-hidden="true">⚠️</span>
                 <p id="error-message" class="error-message"></p>
             </div>
         </section>
 
-        <!-- ================================================================
-             Results Section — Displays epic text and audio player
-             ================================================================ -->
         <section id="results-section" class="results-section" hidden aria-label="Transformation results">
             <div class="results-card">
-                <!-- Epic Text Result -->
                 <div class="result-block">
-                    <h2 class="result-title">
-                        <span class="result-icon" aria-hidden="true">🏰</span>
-                        Your Epic Tale
-                    </h2>
-                    <div id="epic-text-container" class="epic-text-container">
-                        <p id="epic-text" class="epic-text"></p>
+                    <div class="result-heading">
+                        <h2 id="result-title" class="result-title">Your story</h2>
+                        <span id="result-genre-badge" class="genre-badge" hidden></span>
+                    </div>
+                    <div id="epic-text-container" class="story-text-container">
+                        <p id="epic-text" class="story-text"></p>
                     </div>
                 </div>
 
-                <!-- Audio Player -->
                 <div class="result-block audio-block">
-                    <h2 class="result-title">
-                        <span class="result-icon" aria-hidden="true">🎙️</span>
-                        Listen to Your Legend
-                    </h2>
+                    <h2 class="result-title">Audio narration</h2>
                     <div class="audio-player-wrapper">
                         <audio id="audio-player" class="audio-player" controls preload="auto">
                             Your browser does not support the audio element.
@@ -144,24 +103,19 @@
                     </div>
                 </div>
 
-                <!-- Record ID -->
                 <div class="result-meta">
-                    <span class="meta-label">Record ID:</span>
+                    <span class="meta-label">Record ID</span>
                     <code id="record-id" class="meta-value"></code>
                 </div>
             </div>
         </section>
 
-        <!-- ================================================================
-             Footer
-             ================================================================ -->
         <footer class="app-footer">
-            <p>Powered by <strong>Amazon Bedrock</strong> · <strong>AWS Polly</strong> · <strong>Amazon S3</strong> · <strong>DynamoDB</strong></p>
+            <p>Amazon Bedrock · AWS Polly · Amazon S3 · DynamoDB</p>
         </footer>
 
     </main>
 
-    <!-- Application JavaScript -->
     <script src="/static/app.js"></script>
 
 </body>
