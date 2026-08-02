@@ -330,7 +330,7 @@ def transform_text():
         payload = {
             "id": record_id,
             "epic_text": epic_text,
-            "audio_url": f"/api/audio/{record_id}",
+            "audio_url": audio_url,
         }
         audio_assets = get_audio_assets(story_genre)
         payload.update(audio_assets)
