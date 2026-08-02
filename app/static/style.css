@@ -171,8 +171,19 @@ body {
     color: #ef4444;
 }
 
-.genre-field {
+.preferences-row {
+    display: flex;
+    gap: var(--space-md);
     margin-bottom: var(--space-lg);
+}
+
+.preferences-row > * {
+    flex: 1;
+}
+
+.genre-field, .voice-field {
+    /* Reset margin-bottom as it is handled by preferences-row */
+    margin-bottom: 0;
 }
 
 .genre-select {
@@ -431,4 +442,42 @@ body {
         animation-duration: 0.01ms !important;
         transition-duration: 0.01ms !important;
     }
+}
+
+/* Background Emojis */
+.bg-emoji-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: -1;
+    overflow: hidden;
+    pointer-events: none;
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    flex-wrap: wrap;
+    opacity: 0.1;
+    font-size: 8rem;
+    user-select: none;
+    transition: opacity 0.5s ease-in-out;
+}
+
+.bg-emoji-container span {
+    animation: float-emoji 10s ease-in-out infinite alternate;
+}
+
+.bg-emoji-container span:nth-child(even) {
+    animation-duration: 12s;
+    animation-direction: alternate-reverse;
+}
+
+.bg-emoji-container span:nth-child(3n) {
+    animation-duration: 15s;
+}
+
+@keyframes float-emoji {
+    0% { transform: translateY(0) rotate(0deg); }
+    100% { transform: translateY(-30px) rotate(15deg); }
 }

@@ -14,6 +14,7 @@
     <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
+    <div id="bg-emoji-container" class="bg-emoji-container" aria-hidden="true"></div>
 
     <main class="app-container">
 
@@ -43,32 +44,37 @@
                     <span id="char-counter" class="char-counter">0 / 5000</span>
                 </div>
 
-                <div class="genre-field">
-                    <label for="story-genre" class="input-label">Story genre</label>
-                    <select id="story-genre" class="genre-select" aria-describedby="genre-hint">
-                        <option value="fantasy">Fantasy</option>
-                        <option value="horror">Horror</option>
-                        <option value="science-fiction">Science fiction</option>
-                        <option value="romance">Romance</option>
-                        <option value="mystery">Mystery</option>
-                        <option value="thriller">Thriller</option>
-                        <option value="comedy">Comedy</option>
-                    </select>
-                    <p id="genre-hint" class="field-hint">Used when you generate a genre story.</p>
+                <div class="preferences-row">
+                    <div class="genre-field">
+                        <label for="story-genre" class="input-label">Story type</label>
+                        <select id="story-genre" class="genre-select" aria-describedby="genre-hint">
+                            <option value="epic">Epic Narrative</option>
+                            <option value="fantasy">Fantasy</option>
+                            <option value="horror">Horror</option>
+                            <option value="science-fiction">Science fiction</option>
+                            <option value="romance">Romance</option>
+                            <option value="mystery">Mystery</option>
+                            <option value="thriller">Thriller</option>
+                            <option value="comedy">Comedy</option>
+                        </select>
+                        <p id="genre-hint" class="field-hint">Choose the style of your story.</p>
+                    </div>
+
+                    <div class="voice-field">
+                        <label for="voice-preference" class="input-label">Voice</label>
+                        <select id="voice-preference" class="genre-select">
+                            <option value="Matthew">Male</option>
+                            <option value="Joanna">Female</option>
+                        </select>
+                        <p class="field-hint">Select the narrator's voice.</p>
+                    </div>
                 </div>
 
                 <div class="action-buttons">
                     <button id="transform-btn" class="btn btn-primary" type="button">
-                        <span class="btn-default-content">Generate epic narrative</span>
+                        <span class="btn-default-content">Generate story</span>
                         <span class="btn-loading-content" hidden>
                             <span class="spinner" aria-hidden="true"></span>
-                            Generating…
-                        </span>
-                    </button>
-                    <button id="genre-story-btn" class="btn btn-secondary" type="button">
-                        <span class="btn-default-content">Generate genre story</span>
-                        <span class="btn-loading-content" hidden>
-                            <span class="spinner spinner-dark" aria-hidden="true"></span>
                             Generating…
                         </span>
                     </button>
@@ -100,6 +106,9 @@
                         <audio id="audio-player" class="audio-player" controls preload="auto">
                             Your browser does not support the audio element.
                         </audio>
+                        <!-- Hidden audio elements for background music and SFX -->
+                        <audio id="bg-music-player" loop hidden></audio>
+                        <audio id="sfx-player" hidden></audio>
                     </div>
                 </div>
 
