@@ -66,6 +66,45 @@ STORY_GENRES = frozenset({
     "comedy",
 })
 
+def get_audio_assets(story_genre: str | None) -> dict:
+    """Returns background music and SFX URLs for a given genre."""
+    genre = story_genre or "epic"
+    assets = {
+        "fantasy": {
+            "bg_music_url": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3",
+            "sfx_url": "https://actions.google.com/sounds/v1/magic/magical_ping.ogg"
+        },
+        "horror": {
+            "bg_music_url": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3",
+            "sfx_url": "https://actions.google.com/sounds/v1/horror/monster_zombie_growl.ogg"
+        },
+        "science-fiction": {
+            "bg_music_url": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3",
+            "sfx_url": "https://actions.google.com/sounds/v1/science_fiction/sci_fi_door_open.ogg"
+        },
+        "romance": {
+            "bg_music_url": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3",
+            "sfx_url": "https://actions.google.com/sounds/v1/instruments/harp_strum.ogg"
+        },
+        "mystery": {
+            "bg_music_url": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-6.mp3",
+            "sfx_url": "https://actions.google.com/sounds/v1/horror/creepy_wind.ogg"
+        },
+        "thriller": {
+            "bg_music_url": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-7.mp3",
+            "sfx_url": "https://actions.google.com/sounds/v1/alarms/beeps_and_flashes.ogg"
+        },
+        "comedy": {
+            "bg_music_url": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3",
+            "sfx_url": "https://actions.google.com/sounds/v1/cartoon/cartoon_cowbell.ogg"
+        },
+        "epic": {
+            "bg_music_url": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
+            "sfx_url": "https://actions.google.com/sounds/v1/weapons/large_explosion.ogg"
+        }
+    }
+    return assets.get(genre, assets["epic"])
+
 # Set MOCK_AWS=true in environment or leave AWS credentials unconfigured for local demo mode
 MOCK_AWS = os.environ.get("MOCK_AWS", "false").lower() in ("true", "1", "yes")
 
@@ -214,6 +253,10 @@ def transform_text():
             allowed = ", ".join(sorted(STORY_GENRES))
             return jsonify({"error": f"Invalid genre. Choose one of: {allowed}"}), 400
 
+    voice_preference = data.get("voice")
+    if voice_preference and not isinstance(voice_preference, str):
+        return jsonify({"error": "Field 'voice' must be a string"}), 400
+
     logger.info(
         f"Processing text of length {len(original_text)}"
         + (f" (genre={story_genre})" if story_genre else " (epic mode)")
@@ -234,6 +277,8 @@ def transform_text():
             "audio_url": audio_url,
             "demo_mode": True,
         }
+        audio_assets = get_audio_assets(story_genre)
+        payload.update(audio_assets)
         if story_genre:
             payload["genre"] = story_genre
         return jsonify(payload), 200
@@ -249,8 +294,8 @@ def transform_text():
         # =====================================================================
         # STEP 3: Synthesize Speech with AWS Polly
         # =====================================================================
-        logger.info("Synthesizing speech with AWS Polly")
-        audio_stream = synthesize_speech(epic_text)
+        logger.info(f"Synthesizing speech with AWS Polly (Voice: {voice_preference})")
+        audio_stream = synthesize_speech(epic_text, voice_id=voice_preference)
         logger.info("Speech synthesis complete")
 
         record_id = str(uuid.uuid4())
@@ -287,6 +332,9 @@ def transform_text():
             "epic_text": epic_text,
             "audio_url": f"/api/audio/{record_id}",
         }
+        audio_assets = get_audio_assets(story_genre)
+        payload.update(audio_assets)
+        
         if story_genre:
             payload["genre"] = story_genre
         return jsonify(payload), 200
@@ -302,6 +350,8 @@ def transform_text():
             "audio_url": audio_url,
             "demo_mode": True,
         }
+        audio_assets = get_audio_assets(story_genre)
+        payload.update(audio_assets)
         if story_genre:
             payload["genre"] = story_genre
         return jsonify(payload), 200
@@ -459,7 +509,7 @@ def invoke_bedrock(input_text: str, story_genre: str | None = None) -> str:
 
 
 
-def synthesize_speech(text: str) -> io.BytesIO:
+def synthesize_speech(text: str, voice_id: str | None = None) -> io.BytesIO:
     """
     Convert text to speech using AWS Polly.
 
@@ -471,6 +521,7 @@ def synthesize_speech(text: str) -> io.BytesIO:
 
     Args:
         text: The epic narrative text to convert to speech.
+        voice_id: The Polly voice to use (default from env).
 
     Returns:
         An io.BytesIO buffer containing the MP3 audio data.
@@ -479,12 +530,15 @@ def synthesize_speech(text: str) -> io.BytesIO:
         ClientError: If the Polly API call fails.
     """
 
+    if not voice_id:
+        voice_id = POLLY_VOICE_ID
+
     # Call AWS Polly to synthesize speech
     try:
         response = polly_client.synthesize_speech(
             Text=text,
             OutputFormat="mp3",           # MP3 format for broad compatibility
-            VoiceId=POLLY_VOICE_ID,       # Configurable voice (default: Matthew)
+            VoiceId=voice_id,             # Configurable voice
             Engine="neural",              # Neural engine for premium voice quality
         )
     except Exception as e:
@@ -492,7 +546,7 @@ def synthesize_speech(text: str) -> io.BytesIO:
         response = polly_client.synthesize_speech(
             Text=text,
             OutputFormat="mp3",
-            VoiceId=POLLY_VOICE_ID,
+            VoiceId=voice_id,
             Engine="standard",
         )
 
