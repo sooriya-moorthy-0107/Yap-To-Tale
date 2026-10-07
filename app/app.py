@@ -590,9 +590,13 @@ def upload_to_s3(audio_buffer: io.BytesIO, s3_key: str) -> str:
         },
     )
 
-    # Construct the S3 URL for the uploaded object
-    # This uses the virtual-hosted-style URL format
-    audio_url = f"https://{S3_BUCKET_NAME}.s3.{AWS_REGION}.amazonaws.com/{s3_key}"
+    # Construct a presigned URL for the uploaded object
+    # This grants temporary read access even if the bucket is private
+    audio_url = s3_client.generate_presigned_url(
+        'get_object',
+        Params={'Bucket': S3_BUCKET_NAME, 'Key': s3_key},
+        ExpiresIn=3600
+    )
 
     return audio_url
 
