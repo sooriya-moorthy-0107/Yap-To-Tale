@@ -20,7 +20,9 @@ const elements = {
     bgMusicPlayer:      document.getElementById("bg-music-player"),
     sfxPlayer:          document.getElementById("sfx-player"),
     recordId:           document.getElementById("record-id"),
+    resultAuthorBadge:  document.getElementById("result-author-badge"),
     bgEmojiContainer:   document.getElementById("bg-emoji-container"),
+    recentFeedGrid:     document.getElementById("recent-feed-grid"),
 };
 
 const MAX_CHAR_LENGTH = 5000;
@@ -111,6 +113,13 @@ function showResults(data) {
     }
     
     elements.recordId.textContent = data.id;
+
+    if (data.author_alias && elements.resultAuthorBadge) {
+        elements.resultAuthorBadge.textContent = `@${data.author_alias}`;
+        elements.resultAuthorBadge.hidden = false;
+    } else if (elements.resultAuthorBadge) {
+        elements.resultAuthorBadge.hidden = true;
+    }
 
     if (data.genre && data.genre !== "epic") {
         const label = GENRE_LABELS[data.genre] || data.genre;
@@ -246,4 +255,37 @@ elements.audioPlayer.addEventListener("pause", () => {
 elements.audioPlayer.addEventListener("ended", () => {
     elements.bgMusicPlayer.pause();
     elements.bgMusicPlayer.currentTime = 0;
+});
+
+async function loadRecentYaps() {
+    if (!elements.recentFeedGrid) return;
+    elements.recentFeedGrid.innerHTML = '<p class="loader" style="text-align: center; color: var(--color-text-secondary); margin: var(--space-xl) 0;">Loading latest tales...</p>';
+
+    try {
+        const res = await fetch('/api/tales/recent?limit=20');
+        const data = await res.json();
+        
+        if (!data.success || !data.tales.length) {
+            elements.recentFeedGrid.innerHTML = '<p style="text-align: center; color: var(--color-text-secondary); margin: var(--space-xl) 0;">No public yaps yet. Be the first to generate one!</p>';
+            return;
+        }
+
+        elements.recentFeedGrid.innerHTML = data.tales.map(tale => `
+            <div class="tale-card">
+                <div class="tale-header">
+                    <span class="author-badge">🎭 @${tale.author_alias}</span>
+                    <span class="genre-tag">${tale.genre || 'Epic'}</span>
+                </div>
+                <p class="tale-preview">"${tale.prompt_preview}"</p>
+                <audio class="feed-audio-player" controls preload="none" src="${tale.audio_url}"></audio>
+            </div>
+        `).join('');
+    } catch (err) {
+        elements.recentFeedGrid.innerHTML = '<p class="error" style="text-align: center; color: var(--color-error-text); margin: var(--space-xl) 0;">Failed to load feed.</p>';
+    }
+}
+
+// Initial load
+document.addEventListener("DOMContentLoaded", () => {
+    loadRecentYaps();
 });
