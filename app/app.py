@@ -20,6 +20,8 @@ import io
 import json
 import uuid
 import logging
+import random
+import time
 from datetime import datetime, timezone
 
 import boto3
@@ -54,6 +56,15 @@ BEDROCK_MODEL_ID = os.environ.get(
     "BEDROCK_MODEL_ID", "anthropic.claude-3-sonnet-20240229-v1:0"
 )
 POLLY_VOICE_ID = os.environ.get("POLLY_VOICE_ID", "Matthew")
+
+ADJECTIVES = ["neon", "shadow", "cyber", "sleepy", "vintage", "toxic", "chaotic"]
+NOUNS = ["baddie", "girly", "007bond", "gremlin", "wizard", "nomad", "phantom"]
+
+def generate_anonymous_handle() -> str:
+    adj = random.choice(ADJECTIVES)
+    noun = random.choice(NOUNS)
+    suffix = random.randint(10, 999)
+    return f"{adj}_{noun}_{suffix}"
 
 # Supported story genres for genre-mode transformation (epic mode uses no genre / "epic")
 STORY_GENRES = frozenset({
@@ -187,6 +198,59 @@ def serve_cached_audio(audio_id):
     return jsonify({"error": "Audio not found"}), 404
 
 # =============================================================================
+# Route: Feed API Endpoint
+# =============================================================================
+MOCK_TALES = [
+    {
+        "id": "mock-1",
+        "author_alias": "cyber_gremlin_42",
+        "genre": "fantasy",
+        "prompt_preview": "Defeated the coffee machine dragon at 9am, now embarking on quest to review PRs.",
+        "audio_url": "https://yap-to-tale-audio-12345.s3.amazonaws.com/audio/mock-1.mp3",
+        "created_at": int(time.time()),
+    },
+    {
+        "id": "mock-2",
+        "author_alias": "toxic_baddie_808",
+        "genre": "comedy",
+        "prompt_preview": "Accidentally replied-all to the entire 500-person company alias asking who stole my oat milk.",
+        "audio_url": "https://yap-to-tale-audio-12345.s3.amazonaws.com/audio/mock-2.mp3",
+        "created_at": int(time.time()) - 300,
+    },
+    {
+        "id": "mock-3",
+        "author_alias": "neon_wizard_99",
+        "genre": "science-fiction",
+        "prompt_preview": "Deployed to production on a Friday afternoon without tests. May the cosmic signals protect us.",
+        "audio_url": "https://yap-to-tale-audio-12345.s3.amazonaws.com/audio/mock-3.mp3",
+        "created_at": int(time.time()) - 600,
+    }
+]
+
+@app.route("/api/tales/recent", methods=["GET"])
+def get_recent_tales():
+    limit = min(int(request.args.get("limit", 20)), 50)
+    if not dynamodb_table:
+        return jsonify({
+            "success": True, 
+            "tales": MOCK_TALES[:limit]
+        }), 200
+
+    try:
+        response = dynamodb_table.query(
+            IndexName="PublicRecentIndex",
+            KeyConditionExpression="#st = :status",
+            ExpressionAttributeNames={"#st": "status"},
+            ExpressionAttributeValues={":status": "PUBLIC"},
+            ScanIndexForward=False,
+            Limit=limit
+        )
+        return jsonify({"success": True, "tales": response.get("Items", [])}), 200
+    except Exception as e:
+        logger.error(f"Error fetching recent tales: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+# =============================================================================
 # Route: Main Transformation Endpoint
 # =============================================================================
 @app.route("/api/transform", methods=["POST"])
@@ -268,11 +332,13 @@ def transform_text():
     if not use_aws:
         logger.info("Running in DEMO / MOCK mode (No AWS credentials required)")
         record_id = str(uuid.uuid4())
+        author_alias = generate_anonymous_handle()
         epic_text = mock_narrative(original_text, story_genre)
         # Standard sample audio for local testing
-        audio_url = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"
+        audio_url = f"https://yap-to-tale-audio-12345.s3.amazonaws.com/audio/{record_id}.mp3"
         payload = {
             "id": record_id,
+            "author_alias": author_alias,
             "epic_text": epic_text,
             "audio_url": audio_url,
             "demo_mode": True,
@@ -281,6 +347,17 @@ def transform_text():
         payload.update(audio_assets)
         if story_genre:
             payload["genre"] = story_genre
+
+        # Prepend to in-memory mock feed for instant local testing
+        MOCK_TALES.insert(0, {
+            "id": record_id,
+            "author_alias": author_alias,
+            "genre": story_genre or "epic",
+            "prompt_preview": original_text[:120] + "..." if len(original_text) > 120 else original_text,
+            "audio_url": audio_url,
+            "created_at": int(time.time()),
+        })
+
         return jsonify(payload), 200
 
     try:
@@ -317,9 +394,10 @@ def transform_text():
         # =====================================================================
         # STEP 5: Persist Metadata to DynamoDB
         # =====================================================================
+        author_alias = generate_anonymous_handle()
         try:
             logger.info(f"Saving record to DynamoDB: {record_id}")
-            save_to_dynamodb(record_id, original_text, epic_text, audio_url, story_genre)
+            save_to_dynamodb(record_id, original_text, epic_text, audio_url, story_genre, author_alias, voice_preference)
             logger.info("Record saved successfully")
         except Exception as db_err:
             logger.warning(f"DynamoDB save encounter error ({db_err}).")
@@ -329,6 +407,7 @@ def transform_text():
         # =====================================================================
         payload = {
             "id": record_id,
+            "author_alias": author_alias,
             "epic_text": epic_text,
             "audio_url": audio_url,
         }
@@ -342,14 +421,24 @@ def transform_text():
     except Exception as e:
         logger.warning(f"Transformation pipeline failed: {e}. Falling back to Demo mode.")
         record_id = str(uuid.uuid4())
+        author_alias = generate_anonymous_handle()
         epic_text = mock_narrative(original_text, story_genre)
-        audio_url = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"
+        audio_url = f"https://yap-to-tale-audio-12345.s3.amazonaws.com/audio/{record_id}.mp3"
         payload = {
             "id": record_id,
+            "author_alias": author_alias,
             "epic_text": epic_text,
             "audio_url": audio_url,
             "demo_mode": True,
         }
+        MOCK_TALES.insert(0, {
+            "id": record_id,
+            "author_alias": author_alias,
+            "genre": story_genre or "epic",
+            "prompt_preview": original_text[:120] + "..." if len(original_text) > 120 else original_text,
+            "audio_url": audio_url,
+            "created_at": int(time.time()),
+        })
         audio_assets = get_audio_assets(story_genre)
         payload.update(audio_assets)
         if story_genre:
@@ -607,6 +696,8 @@ def save_to_dynamodb(
     epic_text: str,
     audio_url: str,
     story_genre: str | None = None,
+    author_alias: str = "anonymous",
+    voice: str | None = None,
 ) -> None:
     """
     Persist transformation metadata to Amazon DynamoDB.
@@ -629,11 +720,16 @@ def save_to_dynamodb(
     # The table's partition key is assumed to be 'id' (String type)
     item = {
         "id": record_id,
+        "status": "PUBLIC",
+        "created_at": int(time.time()),
+        "author_alias": author_alias,
+        "prompt_preview": original_text[:120] + "..." if len(original_text) > 120 else original_text,
         "original_text": original_text,
         "epic_text": epic_text,
         "audio_url": audio_url,
-        "created_at": datetime.now(timezone.utc).isoformat(),
     }
+    if voice:
+        item["voice"] = voice
     if story_genre:
         item["genre"] = story_genre
     dynamodb_table.put_item(Item=item)

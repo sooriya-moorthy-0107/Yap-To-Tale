@@ -29,95 +29,108 @@
             <p class="app-subtitle">Turn your daily log into a narrative or genre story</p>
         </header>
 
-        <section class="input-section" aria-label="Input your daily log">
-            <div class="input-card">
-                <label for="yap-input" class="input-label">Daily log</label>
-                <textarea
-                    id="yap-input"
-                    class="yap-textarea"
-                    placeholder="Describe your day — meetings, errands, wins, and everything in between."
-                    rows="5"
-                    maxlength="5000"
-                    aria-describedby="char-counter"
-                ></textarea>
-                <div class="textarea-footer">
-                    <span id="char-counter" class="char-counter">0 / 5000</span>
-                </div>
+        <div class="two-column-layout">
+            <div id="create-view" class="column-view">
+                <section class="input-section" aria-label="Input your daily log">
+                    <div class="input-card">
+                        <label for="yap-input" class="input-label">Daily log</label>
+                        <textarea
+                            id="yap-input"
+                            class="yap-textarea"
+                            placeholder="Describe your day — meetings, errands, wins, and everything in between."
+                            rows="5"
+                            maxlength="5000"
+                            aria-describedby="char-counter"
+                        ></textarea>
+                        <div class="textarea-footer">
+                            <span id="char-counter" class="char-counter">0 / 5000</span>
+                        </div>
 
-                <div class="preferences-row">
-                    <div class="genre-field">
-                        <label for="story-genre" class="input-label">Story type</label>
-                        <select id="story-genre" class="genre-select" aria-describedby="genre-hint">
-                            <option value="epic">Epic Narrative</option>
-                            <option value="fantasy">Fantasy</option>
-                            <option value="horror">Horror</option>
-                            <option value="science-fiction">Science fiction</option>
-                            <option value="romance">Romance</option>
-                            <option value="mystery">Mystery</option>
-                            <option value="thriller">Thriller</option>
-                            <option value="comedy">Comedy</option>
-                        </select>
-                        <p id="genre-hint" class="field-hint">Choose the style of your story.</p>
+                        <div class="preferences-row">
+                            <div class="genre-field">
+                                <label for="story-genre" class="input-label">Story type</label>
+                                <select id="story-genre" class="genre-select" aria-describedby="genre-hint">
+                                    <option value="epic">Epic Narrative</option>
+                                    <option value="fantasy">Fantasy</option>
+                                    <option value="horror">Horror</option>
+                                    <option value="science-fiction">Science fiction</option>
+                                    <option value="romance">Romance</option>
+                                    <option value="mystery">Mystery</option>
+                                    <option value="thriller">Thriller</option>
+                                    <option value="comedy">Comedy</option>
+                                </select>
+                                <p id="genre-hint" class="field-hint">Choose the style of your story.</p>
+                            </div>
+
+                            <div class="voice-field">
+                                <label for="voice-preference" class="input-label">Voice</label>
+                                <select id="voice-preference" class="genre-select">
+                                    <option value="Matthew">Male</option>
+                                    <option value="Joanna">Female</option>
+                                </select>
+                                <p class="field-hint">Select the narrator's voice.</p>
+                            </div>
+                        </div>
+
+                        <div class="action-buttons">
+                            <button id="transform-btn" class="btn btn-primary" type="button">
+                                <span class="btn-default-content">Generate story</span>
+                                <span class="btn-loading-content" hidden>
+                                    <span class="spinner" aria-hidden="true"></span>
+                                    Generating…
+                                </span>
+                            </button>
+                        </div>
                     </div>
+                </section>
 
-                    <div class="voice-field">
-                        <label for="voice-preference" class="input-label">Voice</label>
-                        <select id="voice-preference" class="genre-select">
-                            <option value="Matthew">Male</option>
-                            <option value="Joanna">Female</option>
-                        </select>
-                        <p class="field-hint">Select the narrator's voice.</p>
+                <section id="error-section" class="error-section" hidden aria-live="assertive">
+                    <div class="error-card">
+                        <p id="error-message" class="error-message"></p>
                     </div>
-                </div>
+                </section>
 
-                <div class="action-buttons">
-                    <button id="transform-btn" class="btn btn-primary" type="button">
-                        <span class="btn-default-content">Generate story</span>
-                        <span class="btn-loading-content" hidden>
-                            <span class="spinner" aria-hidden="true"></span>
-                            Generating…
-                        </span>
-                    </button>
+                <section id="results-section" class="results-section" hidden aria-label="Transformation results">
+                    <div class="results-card">
+                        <div class="result-block">
+                            <div class="result-heading">
+                                <h2 id="result-title" class="result-title">Your story</h2>
+                                <span id="result-genre-badge" class="genre-badge" hidden></span>
+                            </div>
+                            <div id="epic-text-container" class="story-text-container">
+                                <p id="epic-text" class="story-text"></p>
+                            </div>
+                        </div>
+
+                        <div class="result-block audio-block">
+                            <h2 class="result-title">Audio narration</h2>
+                            <div class="audio-player-wrapper">
+                                <audio id="audio-player" class="audio-player" controls preload="auto">
+                                    Your browser does not support the audio element.
+                                </audio>
+                                <!-- Hidden audio elements for background music and SFX -->
+                                <audio id="bg-music-player" loop hidden></audio>
+                                <audio id="sfx-player" hidden></audio>
+                            </div>
+                        </div>
+
+                        <div class="result-meta">
+                            <span class="meta-label">Author</span>
+                            <span id="result-author-badge" class="author-badge"></span>
+                            <span class="meta-label">Record ID</span>
+                            <code id="record-id" class="meta-value"></code>
+                        </div>
+                    </div>
+                </section>
+            </div> <!-- End create-view -->
+
+            <div id="recent-view" class="column-view">
+                <h2 style="color: var(--color-text-primary); margin-bottom: 1rem;">🔥 Recent Yaps</h2>
+                <div id="recent-feed-grid" class="feed-grid">
+                    <!-- Populated dynamically by app.js -->
                 </div>
             </div>
-        </section>
-
-        <section id="error-section" class="error-section" hidden aria-live="assertive">
-            <div class="error-card">
-                <p id="error-message" class="error-message"></p>
-            </div>
-        </section>
-
-        <section id="results-section" class="results-section" hidden aria-label="Transformation results">
-            <div class="results-card">
-                <div class="result-block">
-                    <div class="result-heading">
-                        <h2 id="result-title" class="result-title">Your story</h2>
-                        <span id="result-genre-badge" class="genre-badge" hidden></span>
-                    </div>
-                    <div id="epic-text-container" class="story-text-container">
-                        <p id="epic-text" class="story-text"></p>
-                    </div>
-                </div>
-
-                <div class="result-block audio-block">
-                    <h2 class="result-title">Audio narration</h2>
-                    <div class="audio-player-wrapper">
-                        <audio id="audio-player" class="audio-player" controls preload="auto">
-                            Your browser does not support the audio element.
-                        </audio>
-                        <!-- Hidden audio elements for background music and SFX -->
-                        <audio id="bg-music-player" loop hidden></audio>
-                        <audio id="sfx-player" hidden></audio>
-                    </div>
-                </div>
-
-                <div class="result-meta">
-                    <span class="meta-label">Record ID</span>
-                    <code id="record-id" class="meta-value"></code>
-                </div>
-            </div>
-        </section>
+        </div>
 
         <footer class="app-footer">
             <p>Amazon Bedrock · AWS Polly · Amazon S3 · DynamoDB</p>
