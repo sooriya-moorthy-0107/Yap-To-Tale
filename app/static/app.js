@@ -36,6 +36,8 @@ const elements = {
 
 let userAlias = localStorage.getItem("yap_user_alias");
 if (!userAlias && elements.loginModal) {
+    const mainContainer = document.querySelector('.app-container');
+    if (mainContainer) mainContainer.style.display = 'none';
     elements.loginModal.hidden = false;
     
     elements.loginBtn.addEventListener("click", () => {
@@ -44,6 +46,7 @@ if (!userAlias && elements.loginModal) {
             userAlias = val;
             localStorage.setItem("yap_user_alias", userAlias);
             elements.loginModal.hidden = true;
+            if (mainContainer) mainContainer.style.display = 'flex';
             loadRecentYaps();
         }
     });
@@ -54,6 +57,7 @@ if (!userAlias && elements.loginModal) {
         userAlias = `${adjectives[Math.floor(Math.random() * adjectives.length)]}_${nouns[Math.floor(Math.random() * nouns.length)]}_${Math.floor(Math.random() * 900) + 10}`;
         localStorage.setItem("yap_user_alias", userAlias);
         elements.loginModal.hidden = true;
+        if (mainContainer) mainContainer.style.display = 'flex';
         loadRecentYaps();
     });
 }
@@ -212,6 +216,7 @@ async function handleTransform() {
         }
 
         showResults(data);
+        loadRecentYaps(); // Refresh recent feed with newly generated yap
     } catch (error) {
         console.error("Transformation request failed:", error);
         if (error instanceof TypeError && error.message.includes("Failed to fetch")) {
@@ -355,19 +360,27 @@ async function renderTaleCard(tale) {
 async function loadRecentYaps() {
     if (!elements.recentFeedGrid) return;
     elements.recentFeedGrid.innerHTML = '<p class="loader" style="text-align: center; color: var(--color-text-secondary); margin: var(--space-xl) 0;">Loading latest tales...</p>';
-    if (elements.myFeedGrid) elements.myFeedGrid.innerHTML = '';
+    if (elements.myFeedGrid) elements.myFeedGrid.innerHTML = '<p class="loader" style="text-align: center; color: var(--color-text-secondary); margin: var(--space-xl) 0;">Loading your tales...</p>';
 
     try {
-        const res = await fetch('/api/tales/recent?limit=20');
-        const data = await res.json();
-        
-        if (!data.success || !data.tales.length) {
-            elements.recentFeedGrid.innerHTML = '<p style="text-align: center; color: var(--color-text-secondary); margin: var(--space-xl) 0;">No public yaps yet. Be the first to generate one!</p>';
-            return;
-        }
+        const [recentRes, myRes] = await Promise.all([
+            fetch('/api/tales/recent?limit=20'),
+            fetch(`/api/tales/user/${encodeURIComponent(userAlias)}?limit=20`)
+        ]);
 
-        const publicTales = data.tales.filter(t => t.author_alias !== userAlias);
-        const myTales = data.tales.filter(t => t.author_alias === userAlias);
+        const recentData = await recentRes.json();
+        const myData = await myRes.json();
+        
+        let publicTales = [];
+        let myTales = [];
+
+        if (recentData.success && recentData.tales) {
+            publicTales = recentData.tales.filter(t => t.author_alias !== userAlias);
+        }
+        
+        if (myData.success && myData.tales) {
+            myTales = myData.tales;
+        }
 
         const publicPromises = publicTales.map(t => renderTaleCard(t));
         const myPromises = myTales.map(t => renderTaleCard(t));
@@ -381,7 +394,8 @@ async function loadRecentYaps() {
         }
 
     } catch (err) {
-        elements.recentFeedGrid.innerHTML = '<p class="error" style="text-align: center; color: var(--color-error-text); margin: var(--space-xl) 0;">Failed to load feed.</p>';
+        elements.recentFeedGrid.innerHTML = '<p class="error" style="text-align: center; color: var(--color-error-text); margin: var(--space-xl) 0;">Failed to load feeds.</p>';
+        if (elements.myFeedGrid) elements.myFeedGrid.innerHTML = '';
     }
 }
 

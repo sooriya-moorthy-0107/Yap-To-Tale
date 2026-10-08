@@ -630,32 +630,36 @@ body {
     border-top: 1px solid var(--color-border);
 }
 .comment-item {
-    font-size: 0.8125rem;
-    margin-bottom: var(--space-sm);
-    padding: var(--space-sm);
-    background: var(--color-surface-elevated);
-    border-radius: var(--radius-sm);
+    font-size: 0.875rem;
+    margin-bottom: var(--space-xs);
+    padding: var(--space-sm) var(--space-md);
+    background: transparent;
+    border-left: 2px solid var(--color-border);
+    margin-left: var(--space-xs);
 }
 .comment-author {
-    font-weight: 600;
-    color: var(--color-primary-text);
-    background: var(--color-accent);
-    padding: 0 4px;
-    border-radius: 4px;
-    margin-right: 4px;
+    font-weight: 700;
+    color: var(--color-text-secondary);
+    font-size: 0.75rem;
+    display: block;
+    margin-bottom: 2px;
 }
 .comment-input-row {
     display: flex;
+    flex-direction: column;
     gap: var(--space-sm);
-    margin-top: var(--space-sm);
+    margin-top: var(--space-md);
+    width: 100%;
 }
 .comment-input-row input {
-    flex: 1;
+    width: 100%;
     min-height: unset;
-    padding: var(--space-xs) var(--space-sm);
+    padding: 12px 12px;
+    font-size: 0.9375rem;
 }
 .comment-input-row button {
-    padding: var(--space-xs) var(--space-md);
+    width: 100%;
+    padding: 12px;
 }
 
 .feed-section-title {

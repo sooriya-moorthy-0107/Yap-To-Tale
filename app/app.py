@@ -250,6 +250,29 @@ def get_recent_tales():
         logger.error(f"Error fetching recent tales: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
 
+
+@app.route("/api/tales/user/<alias>", methods=["GET"])
+def get_user_tales(alias):
+    limit = min(int(request.args.get("limit", 20)), 50)
+    if not dynamodb_table:
+        user_tales = [t for t in MOCK_TALES if t.get("author_alias") == alias]
+        return jsonify({"success": True, "tales": user_tales[:limit]}), 200
+
+    try:
+        response = dynamodb_table.query(
+            IndexName="PublicRecentIndex",
+            KeyConditionExpression="#st = :status",
+            FilterExpression="author_alias = :alias",
+            ExpressionAttributeNames={"#st": "status"},
+            ExpressionAttributeValues={":status": "PUBLIC", ":alias": alias},
+            ScanIndexForward=False,
+            Limit=limit
+        )
+        return jsonify({"success": True, "tales": response.get("Items", [])}), 200
+    except Exception as e:
+        logger.error(f"Error fetching user tales: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
 # =============================================================================
 # Route: Comments API Endpoints
 # =============================================================================
