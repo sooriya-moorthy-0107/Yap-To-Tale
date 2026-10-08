@@ -250,6 +250,88 @@ def get_recent_tales():
         logger.error(f"Error fetching recent tales: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
 
+
+@app.route("/api/tales/user/<alias>", methods=["GET"])
+def get_user_tales(alias):
+    limit = min(int(request.args.get("limit", 20)), 50)
+    if not dynamodb_table:
+        user_tales = [t for t in MOCK_TALES if t.get("author_alias") == alias]
+        return jsonify({"success": True, "tales": user_tales[:limit]}), 200
+
+    try:
+        response = dynamodb_table.query(
+            IndexName="PublicRecentIndex",
+            KeyConditionExpression="#st = :status",
+            FilterExpression="author_alias = :alias",
+            ExpressionAttributeNames={"#st": "status"},
+            ExpressionAttributeValues={":status": "PUBLIC", ":alias": alias},
+            ScanIndexForward=False,
+            Limit=limit
+        )
+        return jsonify({"success": True, "tales": response.get("Items", [])}), 200
+    except Exception as e:
+        logger.error(f"Error fetching user tales: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+# =============================================================================
+# Route: Comments API Endpoints
+# =============================================================================
+@app.route("/api/tales/<tale_id>/comments", methods=["GET"])
+def get_comments(tale_id):
+    if not dynamodb_table:
+        tale = next((t for t in MOCK_TALES if t["id"] == tale_id), None)
+        if not tale:
+            return jsonify({"error": "Tale not found"}), 404
+        return jsonify({"success": True, "comments": tale.get("comments", [])}), 200
+
+    try:
+        response = dynamodb_table.get_item(Key={"id": tale_id})
+        item = response.get("Item")
+        if not item:
+            return jsonify({"error": "Tale not found"}), 404
+        return jsonify({"success": True, "comments": item.get("comments", [])}), 200
+    except Exception as e:
+        logger.error(f"Error fetching comments: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/tales/<tale_id>/comments", methods=["POST"])
+def add_comment(tale_id):
+    data = request.get_json(silent=True)
+    if not data or "text" not in data or "author" not in data:
+        return jsonify({"error": "Missing text or author"}), 400
+
+    comment_obj = {
+        "id": str(uuid.uuid4()),
+        "author": data["author"],
+        "text": data["text"].strip(),
+        "created_at": int(time.time())
+    }
+
+    if not dynamodb_table:
+        tale = next((t for t in MOCK_TALES if t["id"] == tale_id), None)
+        if not tale:
+            return jsonify({"error": "Tale not found"}), 404
+        if "comments" not in tale:
+            tale["comments"] = []
+        tale["comments"].append(comment_obj)
+        return jsonify({"success": True, "comment": comment_obj}), 200
+
+    try:
+        dynamodb_table.update_item(
+            Key={"id": tale_id},
+            UpdateExpression="SET comments = list_append(if_not_exists(comments, :empty_list), :comment)",
+            ExpressionAttributeValues={
+                ":comment": [comment_obj],
+                ":empty_list": []
+            }
+        )
+        return jsonify({"success": True, "comment": comment_obj}), 200
+    except Exception as e:
+        logger.error(f"Error adding comment: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
 # =============================================================================
 # Route: Main Transformation Endpoint
 # =============================================================================
@@ -329,10 +411,12 @@ def transform_text():
     # Check if AWS clients can be initialized or if mock mode is forced
     use_aws = not MOCK_AWS and get_aws_clients()
 
+    req_alias = data.get("author_alias")
+    author_alias = req_alias if req_alias and isinstance(req_alias, str) and len(req_alias) < 50 else generate_anonymous_handle()
+
     if not use_aws:
         logger.info("Running in DEMO / MOCK mode (No AWS credentials required)")
         record_id = str(uuid.uuid4())
-        author_alias = generate_anonymous_handle()
         epic_text = mock_narrative(original_text, story_genre)
         # Standard sample audio for local testing
         audio_url = f"https://yap-to-tale-audio-12345.s3.amazonaws.com/audio/{record_id}.mp3"
@@ -394,7 +478,6 @@ def transform_text():
         # =====================================================================
         # STEP 5: Persist Metadata to DynamoDB
         # =====================================================================
-        author_alias = generate_anonymous_handle()
         try:
             logger.info(f"Saving record to DynamoDB: {record_id}")
             save_to_dynamodb(record_id, original_text, epic_text, audio_url, story_genre, author_alias, voice_preference)
@@ -421,7 +504,6 @@ def transform_text():
     except Exception as e:
         logger.warning(f"Transformation pipeline failed: {e}. Falling back to Demo mode.")
         record_id = str(uuid.uuid4())
-        author_alias = generate_anonymous_handle()
         epic_text = mock_narrative(original_text, story_genre)
         audio_url = f"https://yap-to-tale-audio-12345.s3.amazonaws.com/audio/{record_id}.mp3"
         payload = {
