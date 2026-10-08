@@ -35,17 +35,25 @@ const elements = {
 };
 
 let userAlias = localStorage.getItem("yap_user_alias");
-if (!userAlias && elements.loginModal) {
+
+function showLoginModal() {
     const mainContainer = document.querySelector('.app-container');
     if (mainContainer) mainContainer.style.display = 'none';
-    elements.loginModal.hidden = false;
-    
+    if (elements.loginModal) elements.loginModal.hidden = false;
+}
+
+if (!userAlias) {
+    showLoginModal();
+}
+
+if (elements.loginModal) {
     elements.loginBtn.addEventListener("click", () => {
         const val = elements.loginUsername.value.trim();
         if (val) {
             userAlias = val;
             localStorage.setItem("yap_user_alias", userAlias);
             elements.loginModal.hidden = true;
+            const mainContainer = document.querySelector('.app-container');
             if (mainContainer) mainContainer.style.display = 'flex';
             loadRecentYaps();
         }
@@ -57,8 +65,19 @@ if (!userAlias && elements.loginModal) {
         userAlias = `${adjectives[Math.floor(Math.random() * adjectives.length)]}_${nouns[Math.floor(Math.random() * nouns.length)]}_${Math.floor(Math.random() * 900) + 10}`;
         localStorage.setItem("yap_user_alias", userAlias);
         elements.loginModal.hidden = true;
+        const mainContainer = document.querySelector('.app-container');
         if (mainContainer) mainContainer.style.display = 'flex';
         loadRecentYaps();
+    });
+}
+
+const logoutBtn = document.getElementById("logout-btn");
+if (logoutBtn) {
+    logoutBtn.addEventListener("click", () => {
+        localStorage.removeItem("yap_user_alias");
+        userAlias = null;
+        if (elements.loginUsername) elements.loginUsername.value = "";
+        showLoginModal();
     });
 }
 
@@ -375,7 +394,7 @@ async function loadRecentYaps() {
         let myTales = [];
 
         if (recentData.success && recentData.tales) {
-            publicTales = recentData.tales.filter(t => t.author_alias !== userAlias);
+            publicTales = recentData.tales; // Do not filter out My Yaps here, so they appear in both
         }
         
         if (myData.success && myData.tales) {
