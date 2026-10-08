@@ -23,7 +23,40 @@ const elements = {
     resultAuthorBadge:  document.getElementById("result-author-badge"),
     bgEmojiContainer:   document.getElementById("bg-emoji-container"),
     recentFeedGrid:     document.getElementById("recent-feed-grid"),
+    tabCreate:          document.getElementById("tab-create"),
+    tabRecent:          document.getElementById("tab-recent"),
+    createView:         document.getElementById("create-view"),
+    recentView:         document.getElementById("recent-view"),
+    myFeedGrid:         document.getElementById("my-feed-grid"),
+    loginModal:         document.getElementById("login-modal"),
+    loginUsername:      document.getElementById("login-username"),
+    loginBtn:           document.getElementById("login-btn"),
+    generateAliasBtn:   document.getElementById("generate-alias-btn"),
 };
+
+let userAlias = localStorage.getItem("yap_user_alias");
+if (!userAlias && elements.loginModal) {
+    elements.loginModal.hidden = false;
+    
+    elements.loginBtn.addEventListener("click", () => {
+        const val = elements.loginUsername.value.trim();
+        if (val) {
+            userAlias = val;
+            localStorage.setItem("yap_user_alias", userAlias);
+            elements.loginModal.hidden = true;
+            loadRecentYaps();
+        }
+    });
+    
+    elements.generateAliasBtn.addEventListener("click", () => {
+        const adjectives = ["neon", "shadow", "cyber", "sleepy", "vintage", "toxic", "chaotic"];
+        const nouns = ["baddie", "girly", "007bond", "gremlin", "wizard", "nomad", "phantom"];
+        userAlias = `${adjectives[Math.floor(Math.random() * adjectives.length)]}_${nouns[Math.floor(Math.random() * nouns.length)]}_${Math.floor(Math.random() * 900) + 10}`;
+        localStorage.setItem("yap_user_alias", userAlias);
+        elements.loginModal.hidden = true;
+        loadRecentYaps();
+    });
+}
 
 const MAX_CHAR_LENGTH = 5000;
 const CHAR_WARNING_THRESHOLD = 0.9;
@@ -153,7 +186,8 @@ async function handleTransform() {
     const body = { 
         text: inputText,
         genre: elements.storyGenre.value,
-        voice: elements.voicePreference.value
+        voice: elements.voicePreference.value,
+        author_alias: userAlias
     };
 
     setLoadingState(activeButton);
@@ -257,9 +291,71 @@ elements.audioPlayer.addEventListener("ended", () => {
     elements.bgMusicPlayer.currentTime = 0;
 });
 
+async function submitComment(taleId, inputId, listId) {
+    const inputEl = document.getElementById(inputId);
+    const text = inputEl.value.trim();
+    if (!text) return;
+    inputEl.value = "";
+    try {
+        const res = await fetch(`/api/tales/${taleId}/comments`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ author: userAlias || "anonymous", text })
+        });
+        const data = await res.json();
+        if (data.success) {
+            const listEl = document.getElementById(listId);
+            const div = document.createElement("div");
+            div.className = "comment-item";
+            div.innerHTML = `<span class="comment-author">@${data.comment.author}</span> ${data.comment.text}`;
+            listEl.appendChild(div);
+        }
+    } catch (err) {
+        console.error(err);
+    }
+}
+
+async function fetchCommentsHTML(tale) {
+    try {
+        const res = await fetch(`/api/tales/${tale.id}/comments`);
+        const data = await res.json();
+        let comments = tale.comments || [];
+        if (data.success) comments = data.comments;
+        
+        let html = `<div id="comments-list-${tale.id}">`;
+        comments.forEach(c => {
+            html += `<div class="comment-item"><span class="comment-author">@${c.author}</span> ${c.text}</div>`;
+        });
+        html += `</div>
+        <div class="comment-input-row">
+            <input type="text" id="comment-input-${tale.id}" class="yap-textarea" placeholder="Add a comment...">
+            <button class="btn btn-secondary" onclick="submitComment('${tale.id}', 'comment-input-${tale.id}', 'comments-list-${tale.id}')">Post</button>
+        </div>`;
+        return html;
+    } catch(err) {
+        return "";
+    }
+}
+
+async function renderTaleCard(tale) {
+    const commentsHTML = await fetchCommentsHTML(tale);
+    return `
+        <div class="tale-card">
+            <div class="tale-header">
+                <span class="author-badge">🎭 @${tale.author_alias}</span>
+                <span class="genre-tag">${tale.genre || 'Epic'}</span>
+            </div>
+            <p class="tale-preview">"${tale.prompt_preview}"</p>
+            <audio class="feed-audio-player" controls preload="none" src="${tale.audio_url}" style="border-radius: var(--radius-sm); border: 1px solid var(--color-border); background: var(--color-surface-elevated);"></audio>
+            <div class="comments-section">${commentsHTML}</div>
+        </div>
+    `;
+}
+
 async function loadRecentYaps() {
     if (!elements.recentFeedGrid) return;
     elements.recentFeedGrid.innerHTML = '<p class="loader" style="text-align: center; color: var(--color-text-secondary); margin: var(--space-xl) 0;">Loading latest tales...</p>';
+    if (elements.myFeedGrid) elements.myFeedGrid.innerHTML = '';
 
     try {
         const res = await fetch('/api/tales/recent?limit=20');
@@ -270,19 +366,40 @@ async function loadRecentYaps() {
             return;
         }
 
-        elements.recentFeedGrid.innerHTML = data.tales.map(tale => `
-            <div class="tale-card">
-                <div class="tale-header">
-                    <span class="author-badge">🎭 @${tale.author_alias}</span>
-                    <span class="genre-tag">${tale.genre || 'Epic'}</span>
-                </div>
-                <p class="tale-preview">"${tale.prompt_preview}"</p>
-                <audio class="feed-audio-player" controls preload="none" src="${tale.audio_url}"></audio>
-            </div>
-        `).join('');
+        const publicTales = data.tales.filter(t => t.author_alias !== userAlias);
+        const myTales = data.tales.filter(t => t.author_alias === userAlias);
+
+        const publicPromises = publicTales.map(t => renderTaleCard(t));
+        const myPromises = myTales.map(t => renderTaleCard(t));
+        
+        const publicHTML = (await Promise.all(publicPromises)).join('');
+        const myHTML = (await Promise.all(myPromises)).join('');
+
+        elements.recentFeedGrid.innerHTML = publicHTML || '<p style="text-align: center; color: var(--color-text-secondary); margin: var(--space-xl) 0;">No public yaps yet.</p>';
+        if (elements.myFeedGrid) {
+            elements.myFeedGrid.innerHTML = myHTML || '<p style="text-align: center; color: var(--color-text-secondary); margin: var(--space-xl) 0;">You haven\'t created any yaps yet.</p>';
+        }
+
     } catch (err) {
         elements.recentFeedGrid.innerHTML = '<p class="error" style="text-align: center; color: var(--color-error-text); margin: var(--space-xl) 0;">Failed to load feed.</p>';
     }
+}
+
+if (elements.tabCreate && elements.tabRecent) {
+    elements.tabCreate.addEventListener("click", () => {
+        elements.tabCreate.classList.add("active");
+        elements.tabRecent.classList.remove("active");
+        elements.createView.hidden = false;
+        elements.recentView.hidden = true;
+    });
+
+    elements.tabRecent.addEventListener("click", () => {
+        elements.tabRecent.classList.add("active");
+        elements.tabCreate.classList.remove("active");
+        elements.createView.hidden = true;
+        elements.recentView.hidden = false;
+        loadRecentYaps(); // Refresh feed on switch
+    });
 }
 
 // Initial load

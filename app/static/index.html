@@ -16,6 +16,19 @@
 <body>
     <div id="bg-emoji-container" class="bg-emoji-container" aria-hidden="true"></div>
 
+    <!-- Login Modal -->
+    <div id="login-modal" class="modal-overlay" hidden>
+        <div class="modal-content">
+            <h2>Welcome to Yap-to-Tale</h2>
+            <p>Enter your alias to start yapping anonymously, or let us generate one for you.</p>
+            <input type="text" id="login-username" placeholder="e.g. cyber_gremlin_42" class="yap-textarea" style="min-height: 40px; margin-bottom: var(--space-md);">
+            <div style="display: flex; gap: var(--space-sm);">
+                <button id="login-btn" class="btn btn-primary">Join</button>
+                <button id="generate-alias-btn" class="btn btn-secondary">Generate Alias</button>
+            </div>
+        </div>
+    </div>
+
     <main class="app-container">
 
         <header class="app-header">
@@ -29,8 +42,13 @@
             <p class="app-subtitle">Turn your daily log into a narrative or genre story</p>
         </header>
 
-        <div class="two-column-layout">
-            <div id="create-view" class="column-view">
+        <div class="tab-bar" role="tablist">
+            <button id="tab-create" class="tab-btn active" role="tab" aria-selected="true" aria-controls="create-view">✍️ Create Yap</button>
+            <button id="tab-recent" class="tab-btn" role="tab" aria-selected="false" aria-controls="recent-view">🔥 Recent Yaps</button>
+        </div>
+
+        <div class="tab-content">
+            <div id="create-view" class="column-view" role="tabpanel">
                 <section class="input-section" aria-label="Input your daily log">
                     <div class="input-card">
                         <label for="yap-input" class="input-label">Daily log</label>
@@ -124,10 +142,14 @@
                 </section>
             </div> <!-- End create-view -->
 
-            <div id="recent-view" class="column-view">
-                <h2 style="color: var(--color-text-primary); margin-bottom: 1rem;">🔥 Recent Yaps</h2>
-                <div id="recent-feed-grid" class="feed-grid">
-                    <!-- Populated dynamically by app.js -->
+            <div id="recent-view" class="column-view" role="tabpanel" hidden>
+                <div class="feed-section">
+                    <h2 class="feed-section-title">My Yaps</h2>
+                    <div id="my-feed-grid" class="feed-grid"></div>
+                </div>
+                <div class="feed-section" style="margin-top: var(--space-xl);">
+                    <h2 class="feed-section-title">Public Yaps</h2>
+                    <div id="recent-feed-grid" class="feed-grid"></div>
                 </div>
             </div>
         </div>
