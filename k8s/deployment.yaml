@@ -91,7 +91,7 @@ spec:
             # Amazon Bedrock Model ID for text generation
             # Default: Claude 3 Sonnet (change to your preferred model)
             - name: BEDROCK_MODEL_ID
-              value: "anthropic.claude-3-sonnet-20240229-v1:0"
+              value: "us.anthropic.claude-3-sonnet-20240229-v1:0"
 
             # AWS Polly voice ID for text-to-speech synthesis
             - name: POLLY_VOICE_ID
