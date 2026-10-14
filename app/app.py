@@ -18,6 +18,8 @@ import json
 import uuid
 import random
 import logging
+import random
+import time
 from datetime import datetime, timezone
 from decimal import Decimal
 
@@ -375,6 +377,9 @@ def transform_text():
     created_at = datetime.now(timezone.utc).isoformat()
 
     use_aws = not MOCK_AWS and get_aws_clients()
+
+    req_alias = data.get("author_alias")
+    author_alias = req_alias if req_alias and isinstance(req_alias, str) and len(req_alias) < 50 else generate_anonymous_handle()
 
     if not use_aws:
         logger.info("Running in DEMO / MOCK mode (No AWS credentials configured)")
@@ -905,6 +910,10 @@ def save_to_dynamodb(
     """Dual-indexes audio tale into Amazon DynamoDB."""
     item = {
         "id": record_id,
+        "status": "PUBLIC",
+        "created_at": int(time.time()),
+        "author_alias": author_alias,
+        "prompt_preview": original_text[:120] + "..." if len(original_text) > 120 else original_text,
         "original_text": original_text,
         "epic_text": epic_text,
         "audio_url": audio_url,
