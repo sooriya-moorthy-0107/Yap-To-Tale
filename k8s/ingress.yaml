@@ -1,0 +1,66 @@
+# =============================================================================
+# Yap-to-Tale — Kubernetes Ingress with Automated SSL/TLS (Let's Encrypt)
+# =============================================================================
+# Enforces HTTPS sitewide with valid TLS certificates for browser padlock indicators.
+# Routes traffic to yap-to-tale-service (port 80 -> pod targetPort 5000).
+# =============================================================================
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: yap-to-tale-ingress
+  labels:
+    app: yap-to-tale
+    tier: frontend
+    environment: production
+  annotations:
+    # Use standard NGINX Ingress Controller
+    kubernetes.io/ingress.class: "nginx"
+
+    # Automated SSL/TLS certificate issuance via cert-manager & Let's Encrypt
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+
+    # SSL Redirection: Automatically redirect all HTTP traffic to HTTPS (301)
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+
+    # Security & HSTS Configuration
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      more_set_headers "Strict-Transport-Security: max-age=31536000; includeSubDomains; preload";
+      more_set_headers "X-Content-Type-Options: nosniff";
+      more_set_headers "X-Frame-Options: SAMEORIGIN";
+      more_set_headers "X-XSS-Protection: 1; mode=block";
+
+    # Performance: Enable Gzip compression & proxy buffer sizes
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "180"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "60"
+
+spec:
+  # TLS Termination Configuration
+  tls:
+    - hosts:
+        - "yap-to-tale.com"
+        - "www.yap-to-tale.com"
+      secretName: yap-to-tale-tls-cert
+  rules:
+    - host: "yap-to-tale.com"
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: yap-to-tale-service
+                port:
+                  number: 80
+    - host: "www.yap-to-tale.com"
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: yap-to-tale-service
+                port:
+                  number: 80

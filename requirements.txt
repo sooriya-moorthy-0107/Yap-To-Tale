@@ -13,5 +13,8 @@ boto3==1.38.34
 # Cross-Origin Resource Sharing support for API endpoints
 flask-cors==6.0.0
 
+# Environment variables loader
+python-dotenv==1.0.1
+
 # Unique identifier generation for DynamoDB records
 # (uuid is stdlib, but we list it here as a reminder — no install needed)
