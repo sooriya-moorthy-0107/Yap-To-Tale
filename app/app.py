@@ -18,10 +18,14 @@ import json
 import uuid
 import random
 import logging
-import random
 import time
+import mimetypes
 from datetime import datetime, timezone
 from decimal import Decimal
+
+# Guarantee correct MIME types for static stylesheets and scripts across all environments
+mimetypes.add_type("text/css", ".css")
+mimetypes.add_type("application/javascript", ".js")
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -201,17 +205,21 @@ def apply_security_and_cache_headers(response):
     # Referrer Policy
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
 
-    # Static asset caching
-    if request.path.startswith("/static/"):
+    # Static asset caching & explicit MIME integrity
+    if request.path.startswith("/static/") or request.path.endswith(".css") or request.path.endswith(".js"):
         if any(request.path.endswith(ext) for ext in [".png", ".jpg", ".jpeg", ".ico", ".svg", ".webp", ".mp3", ".ogg"]):
             response.headers["Cache-Control"] = "public, max-age=604800, immutable"
-        elif any(request.path.endswith(ext) for ext in [".css", ".js"]):
+        elif request.path.endswith(".css"):
+            response.headers["Content-Type"] = "text/css; charset=utf-8"
+            response.headers["Cache-Control"] = "public, max-age=86400, stale-while-revalidate=600"
+        elif request.path.endswith(".js"):
+            response.headers["Content-Type"] = "application/javascript; charset=utf-8"
             response.headers["Cache-Control"] = "public, max-age=86400, stale-while-revalidate=600"
 
     return response
 
 # =============================================================================
-# Route: Serve Frontend (index.html), Favicon & Health Checks
+# Route: Serve Frontend (index.html), Favicon, Stylesheet & Health Checks
 # =============================================================================
 @app.route("/")
 def serve_index():
@@ -222,6 +230,26 @@ def serve_index():
 def serve_favicon():
     """Serve the application favicon with long-term cache headers."""
     return send_from_directory(app.static_folder, "favicon.ico", mimetype="image/vnd.microsoft.icon")
+
+@app.route("/style.css")
+def serve_root_style():
+    """Direct root fallback route ensuring style.css is properly linked and served with text/css."""
+    return send_from_directory(app.static_folder, "style.css", mimetype="text/css")
+
+@app.route("/static/style.css")
+def serve_static_style():
+    """Explicit /static/style.css route ensuring guaranteed text/css MIME type across all environments."""
+    return send_from_directory(app.static_folder, "style.css", mimetype="text/css")
+
+@app.route("/app.js")
+def serve_root_js():
+    """Direct root fallback route for app.js."""
+    return send_from_directory(app.static_folder, "app.js", mimetype="application/javascript")
+
+@app.route("/static/app.js")
+def serve_static_js():
+    """Explicit /static/app.js route ensuring application/javascript MIME type."""
+    return send_from_directory(app.static_folder, "app.js", mimetype="application/javascript")
 
 @app.route("/health", methods=["GET"])
 def health_check():
@@ -368,8 +396,11 @@ def transform_text():
             story_genre = "epic"
 
     voice_preference = str(data.get("voice") or POLLY_VOICE_ID)
-    handle = (str(data.get("handle") or "")).strip() or get_default_anonymous_handle()
-    session_id = str(data.get("session_id") or "").strip()
+    header_handle = request.headers.get("X-User-Handle") or request.headers.get("X-Anonymous-Handle") or request.headers.get("X-Author-Alias")
+    header_session = request.headers.get("X-Session-ID") or request.headers.get("X-Anonymous-ID")
+
+    handle = (str(data.get("handle") or "").strip()) or (str(header_handle or "").strip()) or get_default_anonymous_handle()
+    session_id = str(data.get("session_id") or "").strip() or str(header_session or "").strip()
     is_public = bool(data.get("is_public", True))
 
     record_id = str(uuid.uuid4())
@@ -378,8 +409,8 @@ def transform_text():
 
     use_aws = not MOCK_AWS and get_aws_clients()
 
-    req_alias = data.get("author_alias")
-    author_alias = req_alias if req_alias and isinstance(req_alias, str) and len(req_alias) < 50 else generate_anonymous_handle()
+    req_alias = data.get("author_alias") or handle
+    author_alias = str(req_alias).strip() if req_alias and isinstance(req_alias, str) and len(str(req_alias).strip()) < 50 else handle
 
     if not use_aws:
         logger.info("Running in DEMO / MOCK mode (No AWS credentials configured)")
@@ -449,6 +480,7 @@ def transform_text():
             session_id=session_id,
             is_public=is_public,
             created_at=created_at,
+            author_alias=author_alias,
         )
 
         response_payload = {
@@ -592,8 +624,17 @@ def get_my_yaps():
     Recent Activity Panel: Personal History ("My Yaps").
     Fetches tales created by the active session_id or anonymous handle.
     """
-    session_id = request.args.get("session_id", "").strip()
-    handle = request.args.get("handle", "").strip()
+    session_id = (
+        request.args.get("session_id", "").strip()
+        or request.headers.get("X-Session-ID", "").strip()
+        or request.headers.get("X-Anonymous-ID", "").strip()
+    )
+    handle = (
+        request.args.get("handle", "").strip()
+        or request.headers.get("X-User-Handle", "").strip()
+        or request.headers.get("X-Anonymous-Handle", "").strip()
+        or request.headers.get("X-Author-Alias", "").strip()
+    )
 
     if not session_id and not handle:
         return jsonify({"posts": [], "count": 0}), 200
@@ -709,18 +750,28 @@ def handle_comments(post_id):
     # POST method: Add a comment
     data = request.get_json(silent=True) or {}
     text = (data.get("text") or "").strip()
-    handle = (data.get("handle") or "").strip() or get_default_anonymous_handle()
+    header_handle = (
+        request.headers.get("X-User-Handle")
+        or request.headers.get("X-Anonymous-Handle")
+        or request.headers.get("X-Author-Alias")
+    )
+    handle = (data.get("handle") or "").strip() or (str(header_handle or "").strip()) or get_default_anonymous_handle()
 
     if not text:
         return jsonify({"error": "Comment text cannot be empty"}), 400
     if len(text) > 1000:
         return jsonify({"error": "Comment exceeds 1000 characters limit"}), 400
 
+    node_type = str(data.get("node_type") or "reaction").strip().lower()
+    parent_id = str(data.get("parent_id") or "").strip() or None
+
     comment = {
         "id": str(uuid.uuid4()),
         "handle": handle,
         "text": text,
         "created_at": datetime.now(timezone.utc).isoformat(),
+        "node_type": node_type,
+        "parent_id": parent_id,
     }
 
     comments_count = 1
@@ -906,13 +957,16 @@ def save_to_dynamodb(
     session_id: str | None = None,
     is_public: bool = True,
     created_at: str | None = None,
+    author_alias: str | None = None,
 ) -> None:
     """Dual-indexes audio tale into Amazon DynamoDB."""
+    clean_handle = handle or get_default_anonymous_handle(record_id)
+    clean_alias = author_alias or clean_handle
     item = {
         "id": record_id,
         "status": "PUBLIC",
         "created_at": int(time.time()),
-        "author_alias": author_alias,
+        "author_alias": clean_alias,
         "prompt_preview": original_text[:120] + "..." if len(original_text) > 120 else original_text,
         "original_text": original_text,
         "epic_text": epic_text,
