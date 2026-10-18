@@ -45,7 +45,12 @@ ehthumbs.db
 # Docker local overrides
 docker-compose.override.yml
 
-# Testing & Coverage
+# Testing, Playwright & Temporary Scratch Files
 .pytest_cache/
 .coverage
 htmlcov/
+.playwright-mcp/
+test_*.py
+scratch/
+*_preview.png
+verified_ui.png

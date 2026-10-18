@@ -1,171 +1,380 @@
-
 <div align="center">
-  <img src="https://readme-typing-svg.herokuapp.com?font=Fira+Code&weight=700&size=28&pause=1000&color=F7B00A&center=true&vCenter=true&width=500&lines=🚧+Project+Under+Construction+🚧;Deploying+Microservices...;Waking+up+the+AI...;Building+Cloud+Infrastructure..." alt="Under Construction Animation" />
+
+# 🎙️ Yap-to-Tale
+### Cloud-Native Generative AI & Anonymous Audio Social Platform
+
+[![Live Application](https://img.shields.io/badge/Live_App-yap--to--tale.vercel.app-6366f1?style=for-the-badge&logo=vercel&logoColor=white)](https://yap-to-tale.vercel.app/)
+[![Production Status](https://img.shields.io/badge/Status-Production_Ready-10b981?style=for-the-badge&logo=statuspage&logoColor=white)](#-production-release)
+[![Docker](https://img.shields.io/badge/Docker-Containerized-2496ED?style=for-the-badge&logo=docker&logoColor=white)](#-part-2-technical-specifications--docker-setup-guide)
+[![Kubernetes](https://img.shields.io/badge/Kubernetes-EKS_Ready-326CE5?style=for-the-badge&logo=kubernetes&logoColor=white)](#-kubernetes-deployment)
+
+<p align="center">
+  <strong>Transform raw, unfiltered daily thoughts ("yaps") into cinematic audio tales powered by Amazon Bedrock, AWS Polly, Amazon S3, and Amazon DynamoDB with interactive leftward-branching discussion flowcharts.</strong>
+</p>
+
+[🌐 Live Demo](https://yap-to-tale.vercel.app/) • [Architecture](#-system-architecture--data-flow) • [Tech Stack](#-tech-stack-breakdown) • [Visual Showcase](#-website-screenshots--interactive-demo-cards) • [Docker Setup](#-part-2-technical-specifications--docker-setup-guide)
+
+---
+
 </div>
 
+## 📑 Table of Contents
+
+- [Part 1: Overview, Architecture & Visual Showcase](#-part-1-overview-architecture--visual-showcase)
+  - [Project Capabilities](#-project-capabilities)
+  - [System Architecture & Data Flow](#-system-architecture--data-flow)
+  - [Tech Stack Breakdown](#-tech-stack-breakdown)
+  - [Website Screenshots & Interactive Demo Cards](#-website-screenshots--interactive-demo-cards)
+- [Part 2: Technical Specifications & Docker Setup Guide](#-part-2-technical-specifications--docker-setup-guide)
+  - [Directory & File Structure](#-directory--file-structure)
+  - [Repository Cloning](#-repository-cloning)
+  - [Prerequisites & Environment Configuration](#-prerequisites--environment-configuration)
+  - [Exclusive Docker Deployment Workflow](#-exclusive-docker-deployment-workflow)
+  - [Kubernetes Cluster Deployment](#-kubernetes-cluster-deployment)
+  - [API Endpoints Reference](#-api-endpoints-reference)
+
+---
+
+# 🌟 Part 1: Overview, Architecture & Visual Showcase
+
+## 🚀 Live Application
+> **Production Deployment:** [https://yap-to-tale.vercel.app/](https://yap-to-tale.vercel.app/)  
+> Experience real-time AI story generation, direct S3 audio streaming, anonymous handle management, and leftward discussion flowcharts live in the browser.
+
+---
+
+## 💡 Project Capabilities
+
+**Yap-to-Tale** is an enterprise-grade, cloud-native generative AI microservice and Reddit-style anonymous social audio platform. The application is strictly stateless and acts as a zero-touch media production pipeline:
+
+1. **Unstructured Micro-Log Ingestion ("Yaps")**:
+   - Ingests freeform raw daily notes, meeting reflections, workplace updates, or personal confessions up to 5,000 characters.
+2. **Atmospheric AI Story Transformation**:
+   - Leverages **Amazon Bedrock (Anthropic Claude 3)** to restructure everyday logs into rich short narratives across 8 curated genres:
+     - ⚔️ **Epic Narrative**: Heroic chronicles, dramatic turning points, legendary stakes.
+     - 🧙 **High Fantasy**: Enchanted realms, ancient arcane secrets, mythical prophecies.
+     - 👁️ **Psychological Horror**: Unsettling whispers, eerie dread, atmospheric tension.
+     - 🚀 **Sci-Fi Odyssey**: Deep space orbit logs, quantum anomalies, synthetic cores.
+     - 🌹 **Poetic Romance**: Intimate realizations, emotional resonance, tender encounters.
+     - 🕵️ **Noir Mystery**: Cryptic dossiers, smoke-filled investigative deduction.
+     - ⚡ **High-Stakes Thriller**: Encrypted burner transmissions, ticking countdowns.
+     - 🎭 **Witty Comedy**: Satirical primetime situational irony and absurd observations.
+3. **In-Memory Neural Speech Synthesis**:
+   - Converts generated narrative text into studio-grade 24kHz MP3 audio streams via **AWS Polly** (neural and standard engine failover) using in-memory `io.BytesIO` buffers. No temporary files are written to container disk.
+4. **Direct Amazon S3 Media Streaming Engine**:
+   - Streams MP3 audio directly from Amazon S3 with support for HTTP Range requests (`RFC 7233`), enabling low-latency scrubbing and seekable cross-tab playback.
+5. **Dual-Indexed Publishing & Anonymous Identity Management**:
+   - Stories are dual-indexed into **Amazon DynamoDB**:
+     - *Creator's Personal Studio* ("My Yaps" partitioned by session and anonymous alias).
+     - *Global Community Board* (Reddit-style public board with upvote ranking and sorting).
+   - Dynamic anonymous identity generator (`u/Girly`, `u/Baddie`, `u/007Bond`, `u/NeonViper`, etc.) with real-time avatar generation and session synchronization.
+6. **Interactive Leftward-Branching Flowchart Discussions**:
+   - Each shared community audio tale features an expandable discussion flowchart branching towards the left:
+     - **Story Origin Node (Right)** acts as the broadcasting root level.
+     - **Discussion Nodes (Center & Left)** branch leftwards via directional connector stems (`◀`), categorized into *💬 Reactions*, *💡 Theories*, *🔥 Hot Takes*, and *✨ Praise*.
+     - Users can plant new discussion nodes directly into the tree using the inline anonymous node composer.
+
+---
+
+## 🏗️ System Architecture & Data Flow
+
+```
+                                      ┌────────────────────────────────────────────────────────┐
+                                      │                     CLIENT BROWSER                     │
+                                      │  • Home Studio (Creation Suite & Recent Activity)     │
+                                      │  • Community Feed & Leftward Flowchart Discussions     │
+                                      │  • Anonymous Handle Management Modal                   │
+                                      └───────────────────────────┬────────────────────────────┘
+                                                                  │
+                                            HTTP REST / JSON      │  Range Audio Streaming
+                                            X-User-Handle Headers │  (RFC 7233)
+                                                                  ▼
+┌──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│                                             FLASK MICROSERVICE CONTAINER (PYTHON 3.12)                                        │
+│                                                                                                                              │
+│  ┌───────────────────────┐    ┌───────────────────────────┐    ┌──────────────────────────┐    ┌──────────────────────────┐  │
+│  │  Identity & Session   │    │  Story Transformation     │    │  Direct S3 Audio Stream  │    │  Flowchart & Discussions │  │
+│  │  Manager              │    │  Pipeline Controller      │    │  Engine                  │    │  Engine                  │  │
+│  └───────────────────────┘    └─────────────┬─────────────┘    └────────────┬─────────────┘    └────────────┬─────────────┘  │
+└─────────────────────────────────────────────┼───────────────────────────────┼───────────────────────────────┼────────────────┘
+                                              │                               │                               │
+                      ┌───────────────────────┴───────────────────────┐       │                               │
+                      ▼                                               ▼       ▼                               ▼
+       ┌─────────────────────────────┐                 ┌─────────────────────────────┐ ┌─────────────────────────────┐
+       │       AMAZON BEDROCK        │                 │          AMAZON S3          │ │       AMAZON DYNAMODB       │
+       │  Anthropic Claude 3 Sonnet  │                 │   Audio Media Storage       │ │   Dual-Indexed Social Store │
+       │  (Atmospheric Transformation│                 │  • Direct Buffer Upload     │ │  • Partition Key: id        │
+       │   across 8 Story Genres)    │                 │  • 7-Day Presigned URLs     │ │  • Global Feed & My Yaps    │
+       └──────────────┬──────────────┘                 │  • Byte-Range Seek Support  │ │  • Flowchart Nodes & Upvotes│
+                      │ Text Narrative                 └──────────────▲──────────────┘ └─────────────────────────────┘
+                      ▼                                               │
+       ┌─────────────────────────────┐                                │
+       │          AWS POLLY          │                                │
+       │     Neural Voice Engine     │────────────────────────────────┘
+       │  • In-Memory BytesIO Stream │   In-Memory MP3 Buffer Stream
+       │  • 24kHz Studio Audio       │
+       └─────────────────────────────┘
+```
+
+---
+
+## 💻 Tech Stack Breakdown
+
+| Layer | Technology | Version | Purpose & Architecture Role |
+| :--- | :--- | :--- | :--- |
+| **Backend Core** | **Python** | `3.12-slim` | Runtime environment for stateless microservice execution. |
+| **Web Framework** | **Flask** | `3.1.x` | RESTful API routing, security headers (HSTS, nosniff), and asset serving. |
+| **WSGI Server** | **Gunicorn** | `23.x` | Production concurrent WSGI HTTP server with worker concurrency. |
+| **Cloud SDK** | **Boto3 / Botocore** | `1.38.x` | Low-latency AWS API client for Bedrock, Polly, S3, and DynamoDB. |
+| **Generative LLM** | **Amazon Bedrock** | Claude 3 Sonnet | Neural language model transforming raw micro-logs into genre narratives. |
+| **Speech Synthesis** | **AWS Polly** | Neural Engine | Converts story text into studio-grade MP3 audio (Matthew, Joanna, Amy, Brian). |
+| **Media Storage** | **Amazon S3** | Standard Tier | Bucket storing in-memory MP3 streams with presigned URLs and range streaming. |
+| **NoSQL Database** | **Amazon DynamoDB** | On-Demand | Dual-indexes stories, anonymous handles, upvote scores, and flowchart comment trees. |
+| **Frontend Core** | **HTML5 / CSS3 / Vanilla JS** | ES2024 | Modern dark-mode interface with zero heavy UI framework dependencies. |
+| **Typography** | **Google Web Fonts** | Hosted | *Plus Jakarta Sans* (UI), *Outfit* (Headings), and *JetBrains Mono* (Code). |
+| **Containerization** | **Docker** | Multi-stage | Secure non-root container with explicit health probes and layer caching. |
+| **Orchestration** | **Docker Compose** | Compose v2 | Unified multi-container environment orchestration. |
+| **Cloud Orchestration**| **Kubernetes (EKS)** | `apps/v1` | 3-replica production deployment with LoadBalancer service manifests. |
+
+---
+
+## 📸 Website Screenshots & Interactive Demo Cards
+
 <div align="center">
-  <img src="https://readme-typing-svg.herokuapp.com?font=Fira+Code&weight=700&size=28&pause=1000&color=F7B00A&center=true&vCenter=true&width=500&lines=🎙️+Yap-to-Tale;Cloud-Native+GenAI+Microservice;Bedrock+%7C+Polly+%7C+S3+%7C+DynamoDB" alt="Yap-to-Tale Header" />
+
+### 1. Creation Suite & Generation Interface
+*Transform unfiltered logs into epic audio with real-time Polly playback, genre selection, and voice controls.*
+
+![Creation Suite Interface](docs/screenshots/generation_interface.png)
+
+---
+
+### 2. Anonymous Identity Management Modal
+*Customizable anonymous broadcast handle manager featuring live avatar preview, handle prefixing, and curated suggestions grid.*
+
+![Anonymous Identity Modal](docs/screenshots/anonymous_modal.png)
+
+---
+
+### 3. Dual-Feed Recent Activity ("My Yaps")
+*Personal studio feed tracking active session audio creations, seekable media players, and discussion jumps.*
+
+![Recent Activity Panel](docs/screenshots/recent_tab.png)
+
+---
+
+### 4. Community Feed & Leftward Flowchart Comments
+*Modular community audio cards with bottom dropdown toggle expanding into an interactive leftward-branching discussion flowchart.*
+
+![Leftward Flowchart Discussion](docs/screenshots/flowchart_comments.png)
+
 </div>
 
-# 🎙️ Yap-to-Tale: Cloud-Native GenAI & Audio Synthesis
-
-![Python](https://img.shields.io/badge/Python-3.12-blue?logo=python)
-![Flask](https://img.shields.io/badge/Flask-Backend-black?logo=flask)
-![AWS](https://img.shields.io/badge/AWS-Polly%20%7C%20S3%20%7C%20DynamoDB-orange?logo=amazon-aws)
-![Kubernetes](https://img.shields.io/badge/Kubernetes-EKS-326CE5?logo=kubernetes)
-![Docker](https://img.shields.io/badge/Docker-Containerized-2496ED?logo=docker)
-
-## 📖 Overview
-**Yap-to-Tale** is a scalable, cloud-native microservice application designed to ingest unstructured user text (daily micro-logs or "yaps") and dynamically transform them into epic, dramatic multimedia stories. The system acts as a stateless, zero-touch media production pipeline powered by AWS Generative AI services.
-
 ---
 
-## 🏗️ System Architecture & Workflow
+# ⚙️ Part 2: Technical Specifications & Docker Setup Guide
+
+## 📂 Directory & File Structure
 
 ```
-[ User Input / Web UI ]
-          │
-          ▼  POST /api/transform
-[ Flask Microservice (Gunicorn WSGI) ]
-          │
-          ├────────► 1. Amazon Bedrock (Claude 3) ──► Generates Epic Text Narrative
-          │
-          ├────────► 2. AWS Polly (Neural Engine) ──► Synthesizes MP3 Audio Stream (In-Memory)
-          │
-          ├────────► 3. Amazon S3 Bucket ───────────► Stores MP3 File (Direct Buffer Upload)
-          │
-          └────────► 4. Amazon DynamoDB ───────────► Persists UUID, Original & Epic Text, S3 URL
+Yap-To-Tale/
+├── .env.example                 # Environment variables template
+├── .gitignore                   # Git exclusion rules
+├── Dockerfile                   # Multi-stage production Docker container definition
+├── docker-compose.yml           # Docker Compose orchestration specification
+├── requirements.txt             # Python backend dependencies
+├── setup_dynamodb.py            # Automated DynamoDB table provisioning script
+├── vercel.json                  # Serverless production deployment configuration
+├── app/
+│   ├── app.py                   # Main Flask application & AWS pipeline controller
+│   └── static/                  # Production frontend assets
+│       ├── app.js               # Reactive UI logic, modal handlers & flowchart engine
+│       ├── favicon.ico          # Browser favicon
+│       ├── favicon.png          # High-resolution app icon
+│       ├── index.html           # Single-page application markup
+│       ├── og-preview.png       # Open Graph social preview banner
+│       └── style.css            # Modern cyber-dark glassmorphism design system
+├── docs/
+│   └── screenshots/             # Production UI showcase screenshots
+│       ├── anonymous_modal.png
+│       ├── flowchart_comments.png
+│       ├── generation_interface.png
+│       └── recent_tab.png
+└── k8s/                         # Kubernetes cloud manifests
+    ├── deployment.yaml          # 3-replica K8s Deployment with health probes
+    └── service.yaml             # K8s LoadBalancer Service manifest
 ```
 
 ---
 
-## 💻 Tech Stack
+## 📥 Repository Cloning
 
-| Component | Technology |
-| :--- | :--- |
-| **Backend Framework** | Python 3.12, Flask 3.1, Gunicorn, `boto3` |
-| **Frontend UI** | Vanilla HTML5 / CSS3 (Dark-mode, Glassmorphism) / Modern JS |
-| **Containerization & Orchestration** | Docker (`python:3.12-slim`), Kubernetes (3 Replicas, LoadBalancer) |
-| **Cloud Services** | Amazon Bedrock, AWS Polly, Amazon S3, Amazon DynamoDB |
+Clone the repository to your local workstation:
 
----
+```bash
+# Clone the repository via HTTPS
+git clone https://github.com/sooriya-moorthy-0107/Yap-To-Tale.git
 
-## 🛠️ Step-by-Step: How to Run the Project
-
-### Prerequisites
-1. **Python 3.12+** installed on your system.
-2. **AWS CLI** configured (`aws configure`) with credentials that have access to:
-   - Amazon Bedrock (`bedrock:InvokeModel` - Claude 3 Sonnet enabled)
-   - AWS Polly (`polly:SynthesizeSpeech`)
-   - Amazon S3 (`s3:PutObject`)
-   - Amazon DynamoDB (`dynamodb:PutItem`)
+# Navigate into the project directory
+cd Yap-To-Tale
+```
 
 ---
 
-### Option 1: Running Locally (Fastest for Development & Testing)
+## 🔑 Prerequisites & Environment Configuration
 
-1. **Create and Activate a Virtual Environment:**
-   ```bash
-   python -m venv venv
-   # On Windows (PowerShell):
-   .\venv\Scripts\Activate.ps1
-   # On Mac/Linux:
-   source venv/bin/activate
-   ```
+### Required AWS IAM Permissions
+To run with live AWS cloud services, your AWS IAM user or role requires permissions for:
 
-2. **Install Dependencies:**
-   ```bash
-   pip install -r requirements.txt
-   ```
+| Service | IAM Actions | Purpose |
+| :--- | :--- | :--- |
+| **Amazon Bedrock** | `bedrock:InvokeModel` | Anthropic Claude 3 story transformation |
+| **AWS Polly** | `polly:SynthesizeSpeech` | Neural speech audio generation |
+| **Amazon S3** | `s3:PutObject`, `s3:GetObject` | Uploading and streaming generated MP3s |
+| **Amazon DynamoDB** | `dynamodb:PutItem`, `dynamodb:GetItem`, `dynamodb:UpdateItem`, `dynamodb:Scan` | Storing tales, comments, and upvotes |
 
-3. **Set Environment Variables:**
-   ```powershell
-   # Windows PowerShell:
-   $env:AWS_REGION="us-east-1"
-   $env:S3_BUCKET_NAME="your-s3-bucket-name"
-   $env:DYNAMODB_TABLE_NAME="yap-to-tale-records"
-   ```
-   ```bash
-   # Linux / macOS / Bash:
-   export AWS_REGION="us-east-1"
-   export S3_BUCKET_NAME="your-s3-bucket-name"
-   export DYNAMODB_TABLE_NAME="yap-to-tale-records"
-   ```
+> **Note on Demo Mode:** If AWS credentials are not configured or `MOCK_AWS=true` is set, the application automatically activates **Demo / Mock Mode** with simulated narrative transformation and fallback audio streaming for offline local evaluation.
 
-4. **Start the Flask Development Server:**
-   ```bash
-   python app/app.py
-   ```
+### Setting Up Environment Variables
 
-5. **Access the App:**
-   Open your browser and navigate to `http://localhost:5000`
+Create your local `.env` file from the provided template:
 
----
+```bash
+cp .env.example .env
+```
 
-### Option 2: Running with Docker
+Edit `.env` with your specific parameters:
 
-1. **Build the Production Container Image:**
-   ```bash
-   docker build -t yap-to-tale:latest .
-   ```
+```ini
+# =============================================================================
+# Yap-to-Tale Environment Variables
+# =============================================================================
 
-2. **Run the Container with AWS Credentials & Environment Variables:**
-   ```bash
-   docker run -p 5000:5000 \
-     -e AWS_REGION="us-east-1" \
-     -e S3_BUCKET_NAME="your-s3-bucket-name" \
-     -e DYNAMODB_TABLE_NAME="yap-to-tale-records" \
-     -e AWS_ACCESS_KEY_ID="YOUR_ACCESS_KEY" \
-     -e AWS_SECRET_ACCESS_KEY="YOUR_SECRET_KEY" \
-     yap-to-tale:latest
-   ```
+# AWS Region & Credentials
+AWS_REGION=us-east-1
+AWS_ACCESS_KEY_ID=your_aws_access_key_id
+AWS_SECRET_ACCESS_KEY=your_aws_secret_access_key
 
-3. Open `http://localhost:5000` in your browser.
+# Storage & Database Resources
+S3_BUCKET_NAME=your-s3-bucket-name
+DYNAMODB_TABLE_NAME=yap-to-tale-records
+
+# AI Models & Voice Preferences
+BEDROCK_MODEL_ID=us.anthropic.claude-3-sonnet-20240229-v1:0
+POLLY_VOICE_ID=Matthew
+
+# Local Offline Simulation Mode (true / false)
+MOCK_AWS=false
+
+# Flask Environment
+FLASK_ENV=production
+```
 
 ---
 
-### Option 3: Deploying to Kubernetes (Minikube / EKS)
+## 🐳 Exclusive Docker Deployment Workflow
 
-1. **Apply the Kubernetes Deployment and Service:**
-   ```bash
-   kubectl apply -f k8s/deployment.yaml
-   kubectl apply -f k8s/service.yaml
-   ```
+Execution is performed strictly via Docker containerization and Docker Compose orchestration.
 
-2. **Verify Deployment & Pods:**
-   ```bash
-   kubectl get pods -l app=yap-to-tale
-   kubectl get svc yap-to-tale-service
-   ```
+### Method A: Docker Compose Orchestration (Recommended)
 
-3. **Access the Application:**
-   - **For Minikube:** Run `minikube service yap-to-tale-service`
-   - **For Cloud K8s (EKS/GKE):** Access the external IP assigned to `yap-to-tale-service`.
+Docker Compose builds the image, attaches environment variables from `.env`, runs health checks, and starts the container:
+
+```bash
+# Build and run the containerized application in detached mode
+docker compose up --build -d
+```
+
+#### Monitor Container Health & Execution:
+
+```bash
+# View real-time container status and healthcheck probe results
+docker compose ps
+
+# Follow container application logs
+docker compose logs -f yap-to-tale
+```
+
+#### Stopping the Service:
+
+```bash
+docker compose down
+```
 
 ---
 
-## 🎯 What to Do Next (Course Project Action Plan)
+### Method B: Direct Docker Build & Run
 
-### Step 1: Provision AWS Cloud Resources
-1. **S3 Bucket**: Create an S3 bucket (e.g., `yap-to-tale-audio-bucket`) and grant public read access or configure signed URLs for MP3 playback.
-2. **DynamoDB Table**: Create a DynamoDB table named `yap-to-tale-records` with Partition Key `id` (Type: String).
-3. **Bedrock Model Access**: Go to AWS Bedrock Console -> Model Access -> Request access to Anthropic Claude 3 models.
+If running with raw Docker commands:
 
-### Step 2: Test End-to-End Pipeline
-- Launch the application locally or via Docker.
-- Type a daily log entry into the web UI (e.g., *"I woke up, drank coffee, fixed a bug, and went for a walk"*).
-- Click **"Epicify My Yap"**.
-- Verify that the epic text displays on the UI, the MP3 plays smoothly, the audio file is stored in S3, and metadata is recorded in DynamoDB.
+```bash
+# 1. Build the production Docker image
+docker build -t yap-to-tale:latest .
 
-### Step 3: Package & Submit Course Project
-1. Take screenshots of:
-   - Web UI transforming a text.
-   - S3 Bucket containing the generated `.mp3` files.
-   - DynamoDB Table with persistent records.
-2. Commit your complete codebase to GitHub:
-   ```bash
-   git add .
-   git commit -m "feat: complete production codebase for Yap-to-Tale microservice"
-   git push origin main
-   ```
-3. Submit the repository link and architecture walkthrough for academic evaluation!
+# 2. Run the container with your environment configuration
+docker run -d \
+  --name yap-to-tale-app \
+  -p 5000:5000 \
+  --env-file .env \
+  --restart unless-stopped \
+  yap-to-tale:latest
+
+# 3. Verify container is healthy
+docker ps --filter "name=yap-to-tale-app"
+
+# 4. View application logs
+docker logs -f yap-to-tale-app
+```
+
+Once running, access the application in your browser at:  
+👉 **`http://localhost:5000`**
+
+---
+
+## ☸️ Kubernetes Cluster Deployment
+
+For production deployments onto Kubernetes clusters (AWS EKS, GKE, or local Minikube):
+
+```bash
+# 1. Create AWS credentials secret in your K8s namespace
+kubectl create secret generic aws-credentials \
+  --from-literal=aws-access-key-id="YOUR_AWS_ACCESS_KEY_ID" \
+  --from-literal=aws-secret-access-key="YOUR_AWS_SECRET_ACCESS_KEY"
+
+# 2. Apply deployment and service manifests
+kubectl apply -f k8s/deployment.yaml
+kubectl apply -f k8s/service.yaml
+
+# 3. Verify pod replicas (3 Replicas configured with readiness probes)
+kubectl get pods -l app=yap-to-tale
+
+# 4. Obtain external LoadBalancer IP / URL
+kubectl get svc yap-to-tale-service
+```
+
+---
+
+## 📡 API Endpoints Reference
+
+| Method | Endpoint | Description |
+| :--- | :--- | :--- |
+| `GET` | `/` | Serves the single-page application frontend (`index.html`). |
+| `GET` | `/health` | Kubernetes & Docker healthcheck probe (returns HTTP 200). |
+| `POST` | `/api/transform` | Ingests raw yap, invokes Bedrock & Polly, streams to S3, indexes in DynamoDB. |
+| `GET` | `/api/feed` | Retrieves public community board stories (supports `sort=new\|top` and genre filter). |
+| `GET` | `/api/my-yaps` | Retrieves creator history filtered by session ID or anonymous handle. |
+| `GET` | `/api/audio/<audio_id>` | Direct S3 MP3 stream supporting HTTP Range headers (`RFC 7233`). |
+| `POST` | `/api/posts/<id>/upvote` | Atomically increments story upvote score in DynamoDB. |
+| `GET` | `/api/posts/<id>/comments` | Retrieves public discussion thread comments. |
+| `POST` | `/api/posts/<id>/comments` | Adds an anonymous reaction or theory node to the flowchart comment tree. |
+| `GET` | `/api/identity/random-handle`| Generates a random catchy anonymous broadcast handle. |
+
+---
+
+<div align="center">
+
+**Yap-to-Tale** • Built with ❤️ for cloud-native storytelling.
+
+[Back to Top ↑](#-yap-to-tale)
+
+</div>
